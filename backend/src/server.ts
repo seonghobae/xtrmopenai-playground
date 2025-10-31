@@ -3,6 +3,7 @@
  * Fastify server with security hardening (Helmet, CORS, rate limiting)
  */
 
+import crypto from 'crypto';
 import Fastify from 'fastify';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
