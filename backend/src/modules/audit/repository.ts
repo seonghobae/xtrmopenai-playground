@@ -22,7 +22,7 @@ export interface CreateAuditLogParams {
 /**
  * Create audit log entry
  */
-export async function createAuditLog(params: CreateAuditLogParams): Promise<AuditLog> {
+export async function createAuditLog(params: CreateAuditLogParams): Promise<AuditLog | null> {
   try {
     const result = await query<AuditLog>(
       `INSERT INTO app_core.audit_log
@@ -50,7 +50,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<Audi
   } catch (err) {
     // Log but don't throw - audit failures should not break application flow
     logger.error({ err, params }, 'Failed to create audit log');
-    throw err;
+    return null;
   }
 }
 
