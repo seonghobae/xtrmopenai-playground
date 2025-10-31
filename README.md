@@ -124,7 +124,7 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 ```env
 SESSION_SECRET=generate_secure_random_32_chars_minimum
 SESSION_TTL_SECONDS=86400
-SESSION_INACTIVITY_TIMEOUT_SECONDS=3600
+SESSION_INACTIVITY_SECONDS=3600
 ```
 
 ## Database Schema
