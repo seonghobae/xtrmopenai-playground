@@ -6,6 +6,7 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 import { logger } from '../utils/logger.js';
+import { isDevelopment } from '../config/index.js';
 
 /**
  * Error handler
@@ -99,9 +100,7 @@ export function errorHandler(
     success: false,
     error: {
       code: 'INTERNAL_ERROR',
-      message: process.env.NODE_ENV === 'production'
-        ? 'An internal error occurred'
-        : error.message,
+      message: isDevelopment ? error.message : 'An internal error occurred',
     },
   });
 }

@@ -9,7 +9,7 @@
 - Automatic tool catalog synchronization via `tools/list`
 - Interactive tool invocation with parameter forms
 - Performance metrics: success rate, p95 latency, timeouts
-- Server-side security proxy with domain allowlist
+- Server-side security proxy with domain allowlist, request/response size caps, and explicit user consent guard
 
 ### 🤖 Responses API Testing
 - Full OpenAI Responses API support (Chat Completions)
@@ -21,7 +21,7 @@
 ### 🔐 Enterprise Authentication
 - **Casdoor OIDC** integration with PKCE
 - JWKS-based token verification
-- Multi-factor authentication (WebAuthn, TOTP)
+- Optional multi-factor authentication when enforced in Casdoor
 - Role-based access control (RBAC)
 - Organization/tenant isolation
 
@@ -32,8 +32,8 @@
 - Automated price synchronization from OpenAI
 
 ### 🛡️ Security Hardening
-- OWASP ASVS 4.0.3 compliance
-- NIST SP 800-63B authentication guidelines
+- OWASP ASVS 5.0.0 alignment (backward-compatible with ASVS 4.0.3 controls)
+- NIST SP 800-63B authentication guidelines (baseline AAL1; configure Casdoor MFA + session policies for AAL2)
 - Helmet security headers (CSP, HSTS)
 - Global and per-route rate limiting
 - Input validation with Zod schemas
@@ -124,6 +124,7 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 ```env
 SESSION_SECRET=generate_secure_random_32_chars_minimum
 SESSION_TTL_SECONDS=86400
+SESSION_INACTIVITY_TIMEOUT_SECONDS=3600
 ```
 
 ## Database Schema

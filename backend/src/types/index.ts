@@ -305,6 +305,7 @@ export interface AppConfig {
     host: string;
     port: number;
     cors_origin: string[];
+    default_origin: string;
   };
   database: {
     host: string;
@@ -313,6 +314,12 @@ export interface AppConfig {
     user: string;
     password: string;
     max_connections: number;
+    ssl?: {
+      rejectUnauthorized: boolean;
+      ca?: string;
+      cert?: string;
+      key?: string;
+    };
   };
   oidc: {
     issuer: string;
@@ -328,6 +335,7 @@ export interface AppConfig {
   security: {
     session_secret: string;
     session_ttl_seconds: number;
+    session_inactivity_seconds: number;
     rate_limit_max: number;
     rate_limit_window_ms: number;
   };

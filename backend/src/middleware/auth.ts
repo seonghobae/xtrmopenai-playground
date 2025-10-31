@@ -4,7 +4,13 @@
  */
 
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { getSessionByKey, getUserByUuid, buildAuthenticatedUser } from '../modules/auth/repository.js';
+import { z } from 'zod';
+import {
+  getSessionByKey,
+  getUserByUuid,
+  buildAuthenticatedUser,
+  updateSessionLastUsed,
+} from '../modules/auth/repository.js';
 import { logger } from '../utils/logger.js';
 import type { AuthenticatedUser } from '../types/index.js';
 
@@ -70,6 +76,9 @@ export async function authenticate(
     request.user = authenticatedUser;
     request.session_uuid = session.session_uuid;
 
+    // Update session activity for inactivity timeout enforcement
+    await updateSessionLastUsed(session.session_uuid);
+
     logger.debug(
       {
         user_uuid: authenticatedUser.user_uuid,
@@ -116,6 +125,7 @@ export async function optionalAuthenticate(
     const authenticatedUser = await buildAuthenticatedUser(userAccount);
     request.user = authenticatedUser;
     request.session_uuid = session.session_uuid;
+    await updateSessionLastUsed(session.session_uuid);
   } catch (err) {
     logger.warn({ err }, 'Optional authentication failed');
   }
@@ -124,6 +134,8 @@ export async function optionalAuthenticate(
 /**
  * Require specific role in organization
  */
+const orgUuidSchema = z.object({ org_uuid: z.string().uuid() });
+
 export function requireRole(role: string) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     if (!request.user) {
@@ -136,18 +148,28 @@ export function requireRole(role: string) {
       });
     }
 
-    // Extract org_uuid from request (query, params, or body)
-    const orgUuid =
-      (request.query as any)?.org_uuid ||
-      (request.params as any)?.org_uuid ||
-      (request.body as any)?.org_uuid;
+    const sources = [request.query, request.params, request.body];
+    let orgUuid: string | null = null;
+    let validationError: z.ZodError | null = null;
+
+    for (const source of sources) {
+      if (!source) continue;
+      const parsed = orgUuidSchema.safeParse(source);
+      if (parsed.success) {
+        orgUuid = parsed.data.org_uuid;
+        validationError = null;
+        break;
+      }
+      validationError = parsed.error;
+    }
 
     if (!orgUuid) {
       return reply.status(400).send({
         success: false,
         error: {
           code: 'BAD_REQUEST',
-          message: 'Organization UUID required',
+          message: 'Valid organization UUID required',
+          details: validationError?.errors,
         },
       });
     }

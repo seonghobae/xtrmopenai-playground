@@ -15,8 +15,9 @@
 
 ```bash
 cd backend
-npm install --production
+npm install
 npm run build
+npm prune --production
 ```
 
 Build output: `backend/dist/`
@@ -54,6 +55,9 @@ DATABASE_NAME=openai_playground
 DATABASE_USER=app_user
 DATABASE_PASSWORD=<strong-password>
 DATABASE_MAX_CONNECTIONS=20
+DATABASE_SSL_CA=/etc/ssl/certs/ca.pem
+DATABASE_SSL_CERT=
+DATABASE_SSL_KEY=
 
 # Casdoor OIDC
 OIDC_ISSUER=https://casdoor.yourdomain.com
@@ -69,6 +73,7 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 # Security
 SESSION_SECRET=<generate-64-char-random-string>
 SESSION_TTL_SECONDS=86400
+SESSION_INACTIVITY_TIMEOUT_SECONDS=3600
 RATE_LIMIT_MAX=100
 RATE_LIMIT_WINDOW_MS=60000
 ```
@@ -268,9 +273,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 COPY . .
 RUN npm run build
+RUN npm prune --production
 
 FROM node:20-alpine
 

@@ -3,11 +3,11 @@
  * All queries use parameterized statements to prevent SQL injection
  */
 
-import { query, transaction } from '../../utils/database.js';
+import { query } from '../../utils/database.js';
+import { config } from '../../config/index.js';
 import type {
   UserAccount,
   UserSession,
-  OrgMember,
   AuthenticatedUser,
 } from '../../types/index.js';
 import { logger } from '../../utils/logger.js';
@@ -139,10 +139,16 @@ export async function createSession(
  * Get session by key
  */
 export async function getSessionByKey(sessionKey: string): Promise<UserSession | null> {
+  const inactivityCutoff = new Date(
+    Date.now() - config.security.session_inactivity_seconds * 1000
+  );
+
   const result = await query<UserSession>(
     `SELECT * FROM app_core.user_session
-     WHERE session_key = $1 AND expires_at > now()`,
-    [sessionKey]
+     WHERE session_key = $1
+       AND expires_at > now()
+       AND last_used >= $2`,
+    [sessionKey, inactivityCutoff]
   );
 
   return result.rows[0] || null;
@@ -175,7 +181,10 @@ export async function deleteSession(sessionKey: string): Promise<void> {
  */
 export async function deleteExpiredSessions(): Promise<number> {
   const result = await query(
-    `DELETE FROM app_core.user_session WHERE expires_at <= now()`
+    `DELETE FROM app_core.user_session
+     WHERE expires_at <= now()
+        OR last_used < now() - ($1::int * INTERVAL '1 second')`,
+    [config.security.session_inactivity_seconds]
   );
 
   const deletedCount = result.rowCount || 0;

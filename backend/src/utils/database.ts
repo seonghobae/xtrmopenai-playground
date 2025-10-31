@@ -19,7 +19,7 @@ export const pool = new Pool({
   max: config.database.max_connections,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
-  ssl: config.database.host !== 'localhost' ? { rejectUnauthorized: false } : undefined,
+  ssl: config.database.ssl,
 });
 
 // Pool error handler
@@ -35,7 +35,7 @@ pool.on('connect', () => {
 /**
  * Execute a query with parameters (prevents SQL injection)
  */
-export async function query<T = unknown>(
+export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
   text: string,
   params?: unknown[]
 ): Promise<pg.QueryResult<T>> {

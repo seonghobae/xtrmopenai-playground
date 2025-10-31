@@ -4,7 +4,7 @@
  * Compliant with NIST SP 800-63B (AAL2) and OIDC Core 1.0
  */
 
-import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { fetch } from 'undici';
 import crypto from 'crypto';
 import { config } from '../../config/index.js';

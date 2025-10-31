@@ -3,8 +3,8 @@
 ## Overview
 
 OpenAI Playground App implements defense-in-depth security following industry standards:
-- **OWASP ASVS 4.0.3** (Application Security Verification Standard)
-- **NIST SP 800-63B** (Digital Identity Guidelines)
+- **OWASP ASVS 5.0.0** (Application Security Verification Standard)
+- **NIST SP 800-63B** (Digital Identity Guidelines, baseline AAL1 with guidance for AAL2)
 - **OIDC Core 1.0** (OpenID Connect)
 
 ## Authentication Security
@@ -37,8 +37,10 @@ OpenAI Playground App implements defense-in-depth security following industry st
 - **Cookie Name**: `session_id`
 - **Attributes**: `HttpOnly`, `Secure` (production), `SameSite=Lax`
 - **TTL**: Configurable (default 24 hours)
+- **Inactivity Timeout**: Configurable (default 1 hour) enforced on each authenticated request
 - **Rotation**: Session key regenerated on privilege escalation
 - **Cleanup**: Expired sessions deleted by background job
+- **MFA Enforcement**: Configure mandatory MFA policies in Casdoor to achieve NIST AAL2
 
 ## Authorization (RBAC)
 
@@ -51,6 +53,7 @@ OpenAI Playground App implements defense-in-depth security following industry st
 - Middleware checks user membership and roles before allowing resource access
 - Admin role has implicit access to all organization resources
 - Resource-level checks: MCP servers, Responses runs, audit logs
+- MCP tool execution requires explicit user approval token before proxy invocation
 
 ### Example
 ```typescript
@@ -66,7 +69,7 @@ app.post('/api/mcp/servers', {
 1. **Schema Validation**: Zod schemas on all API endpoints
 2. **Type Safety**: TypeScript strict mode
 3. **Whitelist Approach**: Only accept known fields
-4. **Size Limits**: Request body size limited by Fastify
+4. **Size Limits**: Request body size limited by Fastify and MCP proxy caps (1 MB request / 5 MB response)
 5. **Content-Type**: Enforce `application/json` for JSON endpoints
 
 ### SQL Injection Prevention
@@ -309,7 +312,7 @@ Recommended schedule:
 
 ## Compliance Resources
 
-- [OWASP ASVS 4.0.3 PDF](https://github.com/OWASP/ASVS/raw/v4.0.3/4.0/OWASP%20Application%20Security%20Verification%20Standard%204.0.3-en.pdf)
+- [OWASP ASVS 5.0.0](https://owasp.org/www-project-application-security-verification-standard/)
 - [NIST SP 800-63B](https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.800-63b.pdf)
 - [OIDC Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)

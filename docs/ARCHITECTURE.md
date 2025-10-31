@@ -123,8 +123,8 @@ All security-relevant actions logged to `audit_log` table:
 - `detail_json`: Additional context
 
 ### Compliance Standards
-- **ASVS 4.0.3**: Application Security Verification Standard
-- **NIST SP 800-63B**: Digital Identity Guidelines (AAL2+)
+- **ASVS 5.0.0**: Application Security Verification Standard (compatible with 4.0.3 controls)
+- **NIST SP 800-63B**: Digital Identity Guidelines (baseline AAL1; enforce Casdoor MFA + inactivity/reauthentication policies for AAL2)
 - **OIDC Core 1.0**: OpenID Connect specification
 
 ## Cost Monitoring
@@ -264,5 +264,5 @@ CI pipeline fails if schema violates this rule.
 - [OpenAI Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs)
 - [MCP Specification](https://modelcontextprotocol.io/specification/2025-03-26)
 - [Casdoor OIDC](https://casdoor.github.io/docs/how-to-connect/oidc-client/)
-- [OWASP ASVS 4.0.3](https://owasp.org/www-project-application-security-verification-standard/)
+- [OWASP ASVS 5.0.0](https://owasp.org/www-project-application-security-verification-standard/)
 - [NIST SP 800-63B](https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.800-63b.pdf)

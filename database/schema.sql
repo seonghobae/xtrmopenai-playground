@@ -53,7 +53,8 @@ CREATE TABLE app_core.mcp_server (
   meta_json    JSONB DEFAULT '{}'::jsonb,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT mcp_unique UNIQUE (org_uuid, name_text)
+  CONSTRAINT mcp_unique UNIQUE (org_uuid, name_text),
+  CONSTRAINT mcp_allow_domain_not_empty CHECK (array_length(allow_domain, 1) > 0)
 );
 
 -- MCP tool catalog (cached from tools/list)
@@ -156,12 +157,18 @@ CREATE INDEX mcp_execution_created_idx ON app_core.mcp_execution(created_at DESC
 CREATE INDEX response_run_org_idx ON app_core.response_run(org_uuid);
 CREATE INDEX response_run_user_idx ON app_core.response_run(user_uuid);
 CREATE INDEX response_run_created_idx ON app_core.response_run(created_at DESC);
+CREATE INDEX idx_response_run_org_created ON app_core.response_run(org_uuid, created_at) WHERE org_uuid IS NOT NULL;
+CREATE INDEX idx_response_run_user_created ON app_core.response_run(user_uuid, created_at) WHERE user_uuid IS NOT NULL;
+CREATE INDEX idx_response_run_created ON app_core.response_run(created_at);
+CREATE INDEX idx_response_run_org_model_created ON app_core.response_run(org_uuid, model_name, created_at) WHERE org_uuid IS NOT NULL;
 CREATE INDEX stream_event_run_idx ON app_core.stream_event(run_uuid, sequence_num);
 CREATE INDEX audit_log_org_idx ON app_core.audit_log(org_uuid);
 CREATE INDEX audit_log_user_idx ON app_core.audit_log(user_uuid);
 CREATE INDEX audit_log_created_idx ON app_core.audit_log(created_at DESC);
 CREATE INDEX user_session_user_idx ON app_core.user_session(user_uuid);
 CREATE INDEX user_session_expires_idx ON app_core.user_session(expires_at);
+CREATE INDEX idx_mcp_execution_org_created ON app_core.mcp_execution(org_uuid, created_at) WHERE org_uuid IS NOT NULL;
+CREATE INDEX idx_mcp_execution_user_created ON app_core.mcp_execution(user_uuid, created_at) WHERE user_uuid IS NOT NULL;
 
 -- Insert default model prices (example values, update with actual OpenAI pricing)
 INSERT INTO app_core.model_price (model_name, input_price, output_price) VALUES

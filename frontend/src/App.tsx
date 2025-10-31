@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 
@@ -7,7 +7,7 @@ const LoginPage = () => (
   <div style={{ padding: '2rem' }}>
     <h1>OpenAI Playground</h1>
     <p>MCP Test Harness & Responses API Testing Platform</p>
-    <button onClick={() => window.location.href = '/api/auth/login'}>
+    <button type="button" onClick={() => window.location.href = '/api/auth/login'}>
       Login with Casdoor
     </button>
   </div>
@@ -19,10 +19,10 @@ const DashboardPage = () => (
     <p>Welcome to OpenAI Playground</p>
     <nav>
       <ul>
-        <li><a href="/mcp">MCP Test Harness</a></li>
-        <li><a href="/responses">Responses API Testing</a></li>
-        <li><a href="/usage">Usage & Cost Monitoring</a></li>
-        <li><a href="/audit">Audit Logs</a></li>
+        <li><Link to="/mcp">MCP Test Harness</Link></li>
+        <li><Link to="/responses">Responses API Testing</Link></li>
+        <li><Link to="/usage">Usage & Cost Monitoring</Link></li>
+        <li><Link to="/audit">Audit Logs</Link></li>
       </ul>
     </nav>
   </div>

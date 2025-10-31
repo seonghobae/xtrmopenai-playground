@@ -3,7 +3,7 @@
  * Implements security controls: allowlist, timeouts, retries, rate limiting
  */
 
-import { fetch } from 'undici';
+import { fetch, Response } from 'undici';
 import crypto from 'crypto';
 import { logger } from '../../utils/logger.js';
 import type {
@@ -14,12 +14,69 @@ import type {
   McpCallResponse,
 } from '../../types/index.js';
 
+const MAX_REQUEST_SIZE_BYTES = 1024 * 1024; // 1MB
+const MAX_RESPONSE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+interface CallMcpToolOptions {
+  userApproved: boolean;
+  maxRequestSizeBytes?: number;
+  maxResponseSizeBytes?: number;
+}
+
+function ensureRequestSize(body: string, maxBytes: number): void {
+  const byteLength = Buffer.byteLength(body, 'utf8');
+  if (byteLength > maxBytes) {
+    throw new Error(
+      `MCP request exceeds size limit: ${byteLength} bytes > ${maxBytes} bytes`
+    );
+  }
+}
+
+async function readJsonWithLimit<T>(response: Response, maxBytes: number): Promise<T> {
+  const contentLengthHeader = response.headers.get('content-length');
+  if (contentLengthHeader) {
+    const contentLength = Number.parseInt(contentLengthHeader, 10);
+    if (!Number.isNaN(contentLength) && contentLength > maxBytes) {
+      throw new Error(
+        `MCP response exceeds size limit: ${contentLength} bytes > ${maxBytes} bytes`
+      );
+    }
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const text = await response.text();
+    if (Buffer.byteLength(text, 'utf8') > maxBytes) {
+      throw new Error('MCP response exceeds configured size limit');
+    }
+    return JSON.parse(text) as T;
+  }
+
+  const chunks: Buffer[] = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      received += value.length;
+      if (received > maxBytes) {
+        reader.releaseLock();
+        throw new Error('MCP response exceeds configured size limit');
+      }
+      chunks.push(Buffer.from(value));
+    }
+  }
+
+  const payload = Buffer.concat(chunks);
+  return JSON.parse(payload.toString('utf8')) as T;
+}
+
 /**
  * Validate URL against allowlist
  */
 function validateDomain(url: string, allowDomains: string[]): boolean {
   if (allowDomains.length === 0) {
-    return true; // No allowlist = allow all
+    throw new Error('MCP server allowlist cannot be empty - configure allowed domains');
   }
 
   try {
@@ -109,7 +166,8 @@ export async function fetchMcpTools(
 export async function callMcpTool(
   server: McpServer,
   toolName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  options?: CallMcpToolOptions
 ): Promise<McpCallResponse> {
   // Validate domain
   if (!validateDomain(server.base_url, server.allow_domain)) {
@@ -122,6 +180,17 @@ export async function callMcpTool(
     name: toolName,
     arguments: args,
   };
+
+  if (!options || !options.userApproved) {
+    throw new Error('User approval required before invoking MCP tool');
+  }
+
+  const maxRequestSize = options.maxRequestSizeBytes ?? MAX_REQUEST_SIZE_BYTES;
+  const maxResponseSize = options.maxResponseSizeBytes ?? MAX_RESPONSE_SIZE_BYTES;
+  const userApproved = options.userApproved;
+
+  const requestBody = JSON.stringify(request);
+  ensureRequestSize(requestBody, maxRequestSize);
 
   let lastError: Error | null = null;
   const maxRetries = server.retry_count;
@@ -142,23 +211,33 @@ export async function callMcpTool(
       const response = await fetch(callUrl, {
         method: 'POST',
         headers,
-        body: JSON.stringify(request),
+        body: requestBody,
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`MCP tool call failed: ${response.status} ${response.statusText}`);
+        const isClientError = response.status >= 400 && response.status < 500;
+        const error = new Error(
+          isClientError
+            ? `MCP tool call failed with client error: ${response.status} ${response.statusText}`
+            : `MCP tool call failed: ${response.status} ${response.statusText}`
+        );
+        if (isClientError) {
+          (error as Error & { nonRetryable: true }).nonRetryable = true as const;
+        }
+        throw error;
       }
 
-      const data = (await response.json()) as McpCallResponse;
+      const data = await readJsonWithLimit<McpCallResponse>(response, maxResponseSize);
 
       logger.info(
         {
           mcp_uuid: server.mcp_uuid,
           tool_name: toolName,
           attempt: attempt + 1,
+          user_approved: userApproved,
         },
         'MCP tool call succeeded'
       );
@@ -166,6 +245,10 @@ export async function callMcpTool(
       return data;
     } catch (err) {
       lastError = err as Error;
+
+      if ((lastError as { nonRetryable?: boolean }).nonRetryable) {
+        throw lastError;
+      }
 
       if ((err as Error).name === 'AbortError') {
         logger.warn(

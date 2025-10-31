@@ -9,11 +9,31 @@ import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import cookie from '@fastify/cookie';
-import { config } from './config/index.js';
+import { config, isProduction } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { healthCheck, closePool } from './utils/database.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { discoverOidcConfig } from './modules/auth/oidc.js';
+
+const RETURN_URL_COOKIE = 'oidc_return_to';
+
+function resolveRedirectTarget(target?: string): string {
+  const defaultUrl = new URL('/dashboard', config.server.default_origin).toString();
+
+  if (!target) {
+    return defaultUrl;
+  }
+
+  try {
+    const resolved = new URL(target, config.server.default_origin);
+    if (!config.server.cors_origin.includes(resolved.origin)) {
+      return defaultUrl;
+    }
+    return resolved.toString();
+  } catch {
+    return defaultUrl;
+  }
+}
 
 // Create Fastify instance
 const server = Fastify({
@@ -79,7 +99,7 @@ async function registerPlugins() {
     secret: config.security.session_secret,
     parseOptions: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProduction,
       sameSite: 'lax',
       path: '/',
     },
@@ -111,9 +131,23 @@ async function registerRoutes() {
     const { codeVerifier, codeChallenge } = generatePkce();
 
     // Store state, nonce, codeVerifier in session (temporary storage)
-    reply.setCookie('oidc_state', state, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 600 });
-    reply.setCookie('oidc_nonce', nonce, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 600 });
-    reply.setCookie('oidc_verifier', codeVerifier, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 600 });
+    const loginQuery = request.query as { return_to?: string };
+    const returnTo = typeof loginQuery?.return_to === 'string' ? loginQuery.return_to : undefined;
+
+    reply.setCookie('oidc_state', state, { httpOnly: true, secure: isProduction, maxAge: 600 });
+    reply.setCookie('oidc_nonce', nonce, { httpOnly: true, secure: isProduction, maxAge: 600 });
+    reply.setCookie('oidc_verifier', codeVerifier, { httpOnly: true, secure: isProduction, maxAge: 600 });
+
+    if (returnTo) {
+      reply.setCookie(RETURN_URL_COOKIE, returnTo, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: 'lax',
+        maxAge: 600,
+      });
+    } else {
+      reply.clearCookie(RETURN_URL_COOKIE);
+    }
 
     const authUrl = await buildAuthorizationUrl(state, nonce, codeChallenge);
     return reply.redirect(authUrl);
@@ -167,7 +201,7 @@ async function registerRoutes() {
       // Set session cookie
       reply.setCookie('session_id', sessionKey, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProduction,
         sameSite: 'lax',
         maxAge: config.security.session_ttl_seconds,
       });
@@ -176,6 +210,8 @@ async function registerRoutes() {
       reply.clearCookie('oidc_state');
       reply.clearCookie('oidc_nonce');
       reply.clearCookie('oidc_verifier');
+      const requestedRedirect = request.cookies[RETURN_URL_COOKIE];
+      reply.clearCookie(RETURN_URL_COOKIE);
 
       // Audit log
       await createAuditLog({
@@ -186,7 +222,7 @@ async function registerRoutes() {
         user_agent: request.headers['user-agent'],
       });
 
-      return reply.redirect(config.server.cors_origin[0] + '/dashboard');
+      return reply.redirect(resolveRedirectTarget(requestedRedirect));
     } catch (err) {
       logger.error({ err }, 'Login callback failed');
       return reply.status(500).send({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Login failed' } });

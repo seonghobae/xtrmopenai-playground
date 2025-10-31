@@ -22,6 +22,9 @@ const configSchema = z.object({
   DATABASE_USER: z.string().default('postgres'),
   DATABASE_PASSWORD: z.string(),
   DATABASE_MAX_CONNECTIONS: z.coerce.number().default(10),
+  DATABASE_SSL_CA: z.string().optional(),
+  DATABASE_SSL_CERT: z.string().optional(),
+  DATABASE_SSL_KEY: z.string().optional(),
 
   OIDC_ISSUER: z.string().url(),
   OIDC_CLIENT_ID: z.string(),
@@ -34,6 +37,7 @@ const configSchema = z.object({
 
   SESSION_SECRET: z.string().min(32),
   SESSION_TTL_SECONDS: z.coerce.number().default(86400), // 24 hours
+  SESSION_INACTIVITY_SECONDS: z.coerce.number().default(3600), // 1 hour
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000), // 1 minute
 
@@ -53,11 +57,24 @@ if (!envResult.success) {
 const env = envResult.data;
 
 // Export typed configuration
+const corsOrigins = env.CORS_ORIGIN.split(',').map(origin => origin.trim()).filter(Boolean);
+const defaultOrigin = corsOrigins[0] ?? 'http://localhost:5173';
+
+const sslConfig = env.DATABASE_HOST !== 'localhost'
+  ? {
+      rejectUnauthorized: true,
+      ca: env.DATABASE_SSL_CA || undefined,
+      cert: env.DATABASE_SSL_CERT || undefined,
+      key: env.DATABASE_SSL_KEY || undefined,
+    }
+  : undefined;
+
 export const config: AppConfig = {
   server: {
     host: env.SERVER_HOST,
     port: env.SERVER_PORT,
-    cors_origin: env.CORS_ORIGIN.split(',').map(s => s.trim()),
+    cors_origin: corsOrigins,
+    default_origin: defaultOrigin,
   },
   database: {
     host: env.DATABASE_HOST,
@@ -66,6 +83,7 @@ export const config: AppConfig = {
     user: env.DATABASE_USER,
     password: env.DATABASE_PASSWORD,
     max_connections: env.DATABASE_MAX_CONNECTIONS,
+    ssl: sslConfig,
   },
   oidc: {
     issuer: env.OIDC_ISSUER,
@@ -81,6 +99,7 @@ export const config: AppConfig = {
   security: {
     session_secret: env.SESSION_SECRET,
     session_ttl_seconds: env.SESSION_TTL_SECONDS,
+    session_inactivity_seconds: env.SESSION_INACTIVITY_SECONDS,
     rate_limit_max: env.RATE_LIMIT_MAX,
     rate_limit_window_ms: env.RATE_LIMIT_WINDOW_MS,
   },

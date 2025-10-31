@@ -176,6 +176,7 @@ export async function getDailyUsageTrend(params: {
   org_uuid?: string;
   start_date: Date;
   end_date: Date;
+  limit?: number;
 }): Promise<
   Array<{
     date: string;
@@ -199,6 +200,12 @@ export async function getDailyUsageTrend(params: {
   values.push(params.end_date);
 
   const whereClause = `WHERE ${conditions.join(' AND ')}`;
+  let limitClause = '';
+
+  if (params.limit && params.limit > 0) {
+    limitClause = `LIMIT $${paramIndex++}`;
+    values.push(params.limit);
+  }
 
   const result = await query<{
     date: string;
@@ -212,7 +219,8 @@ export async function getDailyUsageTrend(params: {
      FROM app_core.response_run
      ${whereClause}
      GROUP BY DATE(created_at)
-     ORDER BY date DESC`,
+     ORDER BY date DESC
+     ${limitClause}`,
     values
   );
 
