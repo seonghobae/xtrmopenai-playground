@@ -19,13 +19,19 @@ const MAX_RESPONSE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 /**
  * Custom error class for non-retryable errors (e.g., client errors 4xx)
+ * 
+ * The `nonRetryable` property is used in the retry logic to immediately
+ * abort retry attempts when a client error is encountered, as retrying
+ * client errors (400-499) is typically futile.
  */
 class NonRetryableError extends Error {
   readonly nonRetryable = true;
+  readonly statusCode?: number;
 
-  constructor(message: string) {
+  constructor(message: string, statusCode?: number) {
     super(message);
     this.name = 'NonRetryableError';
+    this.statusCode = statusCode;
     // Maintains proper stack trace for where our error was thrown (only available on V8)
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, NonRetryableError);
@@ -240,7 +246,7 @@ export async function callMcpTool(
           : `MCP tool call failed: ${response.status} ${response.statusText}`;
         
         if (isClientError) {
-          throw new NonRetryableError(errorMessage);
+          throw new NonRetryableError(errorMessage, response.status);
         }
         throw new Error(errorMessage);
       }
