@@ -7,6 +7,15 @@ import { query } from '../../utils/database.js';
 import type { McpServer, McpTool, McpExecution } from '../../types/index.js';
 
 /**
+ * Validate that allow_domain array is not empty
+ */
+function validateAllowDomain(allowDomains: string[]): void {
+  if (allowDomains.length === 0) {
+    throw new Error('MCP server allowlist cannot be empty - configure allowed domains');
+  }
+}
+
+/**
  * Create MCP server registration
  */
 export async function createMcpServer(params: {
@@ -19,11 +28,8 @@ export async function createMcpServer(params: {
   retry_count?: number;
   meta_json?: Record<string, unknown>;
 }): Promise<McpServer> {
-  // Validate allow_domain is not empty
   const allowDomains = params.allow_domain || [];
-  if (allowDomains.length === 0) {
-    throw new Error('MCP server allowlist cannot be empty - configure allowed domains');
-  }
+  validateAllowDomain(allowDomains);
 
   const result = await query<McpServer>(
     `INSERT INTO app_core.mcp_server
@@ -102,10 +108,7 @@ export async function updateMcpServer(
   }
 
   if (updates.allow_domain !== undefined) {
-    // Validate allow_domain is not empty
-    if (updates.allow_domain.length === 0) {
-      throw new Error('MCP server allowlist cannot be empty - configure allowed domains');
-    }
+    validateAllowDomain(updates.allow_domain);
     fields.push(`allow_domain = $${paramIndex++}`);
     values.push(updates.allow_domain);
   }
