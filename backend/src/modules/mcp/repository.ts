@@ -19,6 +19,12 @@ export async function createMcpServer(params: {
   retry_count?: number;
   meta_json?: Record<string, unknown>;
 }): Promise<McpServer> {
+  // Validate allow_domain is not empty
+  const allowDomains = params.allow_domain || [];
+  if (allowDomains.length === 0) {
+    throw new Error('MCP server allowlist cannot be empty - configure allowed domains');
+  }
+
   const result = await query<McpServer>(
     `INSERT INTO app_core.mcp_server
      (org_uuid, name_text, base_url, auth_header, allow_domain, timeout_ms, retry_count, meta_json)
@@ -29,7 +35,7 @@ export async function createMcpServer(params: {
       params.name_text,
       params.base_url,
       params.auth_header || null,
-      params.allow_domain || [],
+      allowDomains,
       params.timeout_ms || 30000,
       params.retry_count || 3,
       JSON.stringify(params.meta_json || {}),
@@ -96,6 +102,10 @@ export async function updateMcpServer(
   }
 
   if (updates.allow_domain !== undefined) {
+    // Validate allow_domain is not empty
+    if (updates.allow_domain.length === 0) {
+      throw new Error('MCP server allowlist cannot be empty - configure allowed domains');
+    }
     fields.push(`allow_domain = $${paramIndex++}`);
     values.push(updates.allow_domain);
   }
