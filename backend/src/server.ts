@@ -139,14 +139,14 @@ async function registerRoutes() {
     reply.setCookie('oidc_verifier', codeVerifier, { httpOnly: true, secure: isProduction, maxAge: 600 });
 
     if (returnTo) {
-      reply.setCookie(RETURN_URL_COOKIE, returnTo, {
+      reply.setCookie(OIDC_RETURN_URL_COOKIE, returnTo, {
         httpOnly: true,
         secure: isProduction,
         sameSite: 'lax',
         maxAge: 600,
       });
     } else {
-      reply.clearCookie(RETURN_URL_COOKIE);
+      reply.clearCookie(OIDC_RETURN_URL_COOKIE);
     }
 
     const authUrl = await buildAuthorizationUrl(state, nonce, codeChallenge);
@@ -210,8 +210,8 @@ async function registerRoutes() {
       reply.clearCookie('oidc_state');
       reply.clearCookie('oidc_nonce');
       reply.clearCookie('oidc_verifier');
-      const requestedRedirect = request.cookies[RETURN_URL_COOKIE];
-      reply.clearCookie(RETURN_URL_COOKIE);
+      const requestedRedirect = request.cookies[OIDC_RETURN_URL_COOKIE];
+      reply.clearCookie(OIDC_RETURN_URL_COOKIE);
 
       // Audit log
       await createAuditLog({

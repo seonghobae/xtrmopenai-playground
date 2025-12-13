@@ -53,8 +53,7 @@ CREATE TABLE app_core.mcp_server (
   meta_json    JSONB DEFAULT '{}'::jsonb,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT mcp_unique UNIQUE (org_uuid, name_text),
-  CONSTRAINT mcp_allow_domain_not_empty CHECK (array_length(allow_domain, 1) > 0)
+  CONSTRAINT mcp_unique UNIQUE (org_uuid, name_text)
 );
 
 -- MCP tool catalog (cached from tools/list)
