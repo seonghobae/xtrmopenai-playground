@@ -47,7 +47,7 @@ CREATE TABLE app_core.mcp_server (
   name_text    TEXT NOT NULL,
   base_url     TEXT NOT NULL,
   auth_header  TEXT, -- Encrypted or reference to secrets vault
-  allow_domain TEXT[] NOT NULL DEFAULT '{}',
+  allow_domain TEXT[] NOT NULL,
   timeout_ms   INT NOT NULL DEFAULT 30000,
   retry_count  INT NOT NULL DEFAULT 3,
   meta_json    JSONB DEFAULT '{}'::jsonb,

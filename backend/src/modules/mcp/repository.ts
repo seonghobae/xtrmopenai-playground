@@ -14,7 +14,7 @@ export async function createMcpServer(params: {
   name_text: string;
   base_url: string;
   auth_header?: string;
-  allow_domain?: string[];
+  allow_domain: string[];
   timeout_ms?: number;
   retry_count?: number;
   meta_json?: Record<string, unknown>;
@@ -29,7 +29,7 @@ export async function createMcpServer(params: {
       params.name_text,
       params.base_url,
       params.auth_header || null,
-      params.allow_domain || [],
+      params.allow_domain,
       params.timeout_ms || 30000,
       params.retry_count || 3,
       JSON.stringify(params.meta_json || {}),
