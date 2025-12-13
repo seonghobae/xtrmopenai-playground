@@ -15,7 +15,7 @@ import { healthCheck, closePool } from './utils/database.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { discoverOidcConfig } from './modules/auth/oidc.js';
 
-const RETURN_URL_COOKIE = 'oidc_return_to';
+const OIDC_RETURN_URL_COOKIE = 'oidc_return_to';
 
 function resolveRedirectTarget(target?: string): string {
   const defaultUrl = new URL('/dashboard', config.server.default_origin).toString();
