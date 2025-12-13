@@ -17,6 +17,27 @@ import type {
 const MAX_REQUEST_SIZE_BYTES = 1024 * 1024; // 1MB
 const MAX_RESPONSE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
+/**
+ * Custom error class for signaling non-retryable errors, such as client errors (HTTP 4xx).
+ * 
+ * Use this error to indicate that retrying the operation is not appropriate,
+ * for example when the error is due to invalid input or other client-side issues.
+ */
+class NonRetryableError extends Error {
+  readonly nonRetryable = true;
+  readonly statusCode?: number;
+
+  constructor(message: string, statusCode?: number) {
+    super(message);
+    this.name = 'NonRetryableError';
+    this.statusCode = statusCode;
+    // Maintains proper stack trace for where our error was thrown (only available on V8)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, NonRetryableError);
+    }
+  }
+}
+
 interface CallMcpToolOptions {
   userApproved: boolean;
   maxRequestSizeBytes?: number;
@@ -219,15 +240,14 @@ export async function callMcpTool(
 
       if (!response.ok) {
         const isClientError = response.status >= 400 && response.status < 500;
-        const error = new Error(
-          isClientError
-            ? `MCP tool call failed with client error: ${response.status} ${response.statusText}`
-            : `MCP tool call failed: ${response.status} ${response.statusText}`
-        );
+        const errorMessage = isClientError
+          ? `MCP tool call failed with client error: ${response.status} ${response.statusText}`
+          : `MCP tool call failed: ${response.status} ${response.statusText}`;
+
         if (isClientError) {
-          (error as Error & { nonRetryable: true }).nonRetryable = true as const;
+          throw new NonRetryableError(errorMessage, response.status);
         }
-        throw error;
+        throw new Error(errorMessage);
       }
 
       const data = await readJsonWithLimit<McpCallResponse>(response, maxResponseSize);
@@ -246,7 +266,7 @@ export async function callMcpTool(
     } catch (err) {
       lastError = err as Error;
 
-      if ((lastError as { nonRetryable?: boolean }).nonRetryable) {
+      if (lastError instanceof NonRetryableError) {
         throw lastError;
       }
 
