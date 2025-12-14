@@ -347,6 +347,9 @@ async function start() {
     });
 
     // Start session cleanup scheduler
+    // NOTE: This is for database housekeeping only. Session expiry and inactivity
+    // enforcement happens at every authenticated request in getSessionByKey() WHERE clause.
+    // This scheduler just removes stale records to prevent table bloat.
     const cleanupIntervalMs = config.security.session_cleanup_interval_seconds * 1000;
     
     sessionCleanupInterval = setInterval(async () => {

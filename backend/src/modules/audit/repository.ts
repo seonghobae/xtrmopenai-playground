@@ -57,6 +57,14 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<Audi
 
 /**
  * Get audit logs with pagination and filters
+ * 
+ * RBAC Access Control (to be implemented at API layer):
+ * - General users: Should NOT access this function or have PII fields filtered
+ * - Auditors/Admins: Full access to all fields including PII (ip_addr, user_agent)
+ * - Organization scope: Users can only query logs from their organizations
+ * 
+ * PII fields (ip_addr, user_agent, detail_json) are progressively anonymized
+ * based on retention policies. See applyAuditRetentionPolicy() below.
  */
 export async function getAuditLogs(params: {
   org_uuid?: string;

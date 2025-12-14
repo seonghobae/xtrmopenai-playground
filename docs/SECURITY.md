@@ -36,11 +36,34 @@ OpenAI Playground App implements defense-in-depth security following industry st
 ### Session Security
 - **Cookie Name**: `session_id`
 - **Attributes**: `HttpOnly`, `Secure` (production), `SameSite=Lax`
-- **TTL**: Configurable (default 24 hours)
-- **Inactivity Timeout**: Configurable (default 1 hour) enforced on each authenticated request
+- **TTL**: Configurable (default 24 hours via `SESSION_TTL_SECONDS`)
+- **Inactivity Timeout**: Configurable (default 1 hour via `SESSION_INACTIVITY_SECONDS`)
 - **Rotation**: Session key regenerated on privilege escalation
-- **Cleanup**: Expired sessions deleted by background job
+- **Cleanup**: Expired sessions deleted by background job (housekeeping only)
 - **MFA Enforcement**: Configure mandatory MFA policies in Casdoor to achieve NIST AAL2
+
+#### Real-Time Session Validation
+
+**Critical Security Implementation**: Session expiry and inactivity timeouts are enforced at **every authenticated request**, not just during scheduled cleanup.
+
+The `getSessionByKey()` function validates BOTH conditions in the SQL WHERE clause:
+1. **Absolute TTL**: `expires_at > now()` - Session must not exceed configured lifetime
+2. **Inactivity timeout**: `last_used >= (now - SESSION_INACTIVITY_SECONDS)` - Recent activity required
+
+This ensures:
+- ✅ Expired or inactive sessions are rejected immediately at request time
+- ✅ No security gap between cleanup intervals
+- ✅ Meets NIST AAL2 requirements for session timeout enforcement
+- ✅ Cleanup scheduler (`deleteExpiredSessions()`) is only for database housekeeping
+
+**Code Reference**: `backend/src/modules/auth/repository.ts` lines 141-155
+
+**Configuration**:
+```env
+SESSION_TTL_SECONDS=86400        # 24 hours - absolute maximum lifetime
+SESSION_INACTIVITY_SECONDS=3600  # 1 hour - required activity window
+SESSION_CLEANUP_INTERVAL_SECONDS=3600  # 1 hour - DB cleanup frequency (not security-critical)
+```
 
 ## Authorization (RBAC)
 
@@ -247,9 +270,45 @@ deletion_days:        1825  -- 5 years (financial regulations)
 
 #### Access Control
 
-- **General users**: Cannot access PII fields in audit logs
-- **Auditors/Admins**: Full access during retention periods
-- **Implementation**: Role-based filtering in `getAuditLogs()` (future enhancement)
+Audit log access is controlled via RBAC to prevent unauthorized PII exposure:
+
+- **General users**: Should NOT have access to audit log endpoints
+- **Auditors/Security roles**: Full access to all fields including PII (ip_addr, user_agent, detail_json)
+- **Admin role**: Full access to audit logs within their organization scope
+- **Organization isolation**: Users can only query logs from organizations they belong to
+
+**Implementation Requirements**:
+1. API endpoints must check user role before calling `getAuditLogs()`
+2. Restrict audit log access to users with 'auditor', 'security', or 'admin' roles
+3. Always filter by `org_uuid` based on user's organization memberships
+4. Consider additional PII field filtering for non-admin roles if needed
+
+**Code Example**:
+```typescript
+// In API endpoint handler
+server.get('/api/audits', async (request, reply) => {
+  await authenticate(request, reply);
+  if (!request.user) return;
+  
+  // Check role
+  const hasAuditAccess = request.user.organizations.some(org => 
+    org.role_list.includes('admin') || 
+    org.role_list.includes('auditor') ||
+    org.role_list.includes('security')
+  );
+  
+  if (!hasAuditAccess) {
+    return reply.status(403).send({ 
+      success: false, 
+      error: { code: 'FORBIDDEN', message: 'Audit access requires admin/auditor role' } 
+    });
+  }
+  
+  // Fetch logs with organization scope
+  const orgUuids = request.user.organizations.map(o => o.org_uuid);
+  // ... query logic with org_uuid filter
+});
+```
 
 #### Applying Retention Policies
 
