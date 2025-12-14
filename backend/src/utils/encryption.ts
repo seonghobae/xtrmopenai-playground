@@ -12,6 +12,10 @@ const IV_LENGTH = 16; // GCM recommended IV length
 const AUTH_TAG_LENGTH = 16;
 const SALT_LENGTH = 32;
 
+// Rate limiting for legacy data warnings to prevent log flooding
+const legacyDataWarningCache = new Set<string>();
+const LEGACY_WARNING_CACHE_MAX_SIZE = 1000;
+
 /**
  * Derive encryption key from the master key using PBKDF2
  */
@@ -91,8 +95,8 @@ function isEncrypted(data: string): boolean {
  * 
  * **Backward Compatibility Fallback:**
  * - Returns plaintext as-is for legacy unencrypted data (detected via isEncrypted check)
- * - Returns original input on decryption failure as a safety measure for corrupted data
- * - Emits warning logs when fallback behavior is triggered to facilitate migration tracking
+ * - Returns null on decryption failure to prevent exposing encrypted data to application code
+ * - Emits warning logs when fallback behavior is triggered (rate-limited to prevent log flooding)
  * 
  * **Migration Plan:**
  * - All new data is encrypted using the encrypt() function
@@ -108,7 +112,17 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
   // Check if this looks like encrypted data
   if (!isEncrypted(encrypted)) {
     // Legacy plaintext data - return as-is for backward compatibility
-    logger.warn('Decrypting legacy plaintext data - migration needed');
+    // Rate-limit warnings to prevent log flooding
+    const cacheKey = `legacy_${encrypted.substring(0, 20)}`;
+    if (!legacyDataWarningCache.has(cacheKey)) {
+      logger.warn('Decrypting legacy plaintext data - migration needed');
+      legacyDataWarningCache.add(cacheKey);
+      
+      // Prevent cache from growing indefinitely
+      if (legacyDataWarningCache.size > LEGACY_WARNING_CACHE_MAX_SIZE) {
+        legacyDataWarningCache.clear();
+      }
+    }
     return encrypted;
   }
 
@@ -142,9 +156,9 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
     
     return decrypted.toString('utf8');
   } catch (err) {
-    // Decryption failed - this might be corrupted data or invalid encryption
-    // Return plaintext as fallback for edge cases
-    logger.warn('Decryption failed - returning original data (possible corruption or legacy format)');
-    return encrypted;
+    // Decryption failed - return null to signal failure
+    // Returning the encrypted data would be a security risk as it could expose encrypted content
+    logger.warn('Decryption failed - returning null (possible corruption or invalid format)');
+    return null;
   }
 }
