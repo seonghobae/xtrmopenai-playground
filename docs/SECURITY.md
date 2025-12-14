@@ -186,14 +186,121 @@ app.post('/api/responses/run', {
 - `org_uuid`: In which organization context
 - `action_name`: Standardized action identifier
 - `result_code`: success, failure, denied, error
-- `ip_addr`: Source IP address
-- `user_agent`: Browser/client identifier
-- `detail_json`: Additional context (safe to include)
+- `ip_addr`: Source IP address (subject to retention policy)
+- `user_agent`: Browser/client identifier (subject to retention policy)
+- `detail_json`: Additional context (subject to retention policy)
 
-### Retention
-- **Default**: 90 days
-- **Compliance**: Adjust based on regulatory requirements
-- **Cleanup**: Scheduled job deletes old logs
+### PII and Retention Policy
+
+**Challenge**: Audit logs contain PII (IP addresses, user agents) needed for security investigations, but this conflicts with privacy requirements. Masking Korean language or other multilingual LLM responses at runtime is impractical.
+
+**Solution**: Database-stored multi-tier retention policies with progressive anonymization.
+
+#### Multi-Tier Retention Strategy
+
+Audit logs follow a conservative 4-stage lifecycle stored in `app_core.retention_policy`:
+
+1. **Full Retention** (Default: 180 days / 6 months)
+   - All data including PII kept intact
+   - Enables comprehensive security incident investigation
+   - Meets most regulatory requirements for active investigation periods
+
+2. **Partial Anonymization** (Default: 365 days / 1 year)
+   - IP addresses hashed with HMAC-SHA256 (128-bit output) using dedicated stable salt
+   - User agents retained for security analysis
+   - Meets PCI DSS requirement 10.7 (minimum 1 year)
+   - Marked with `_partial_anonymized` timestamp in `detail_json`
+
+3. **Full Anonymization** (Default: 1095 days / 3 years)
+   - All PII removed (IP address, user agent set to NULL)
+   - Only non-PII audit metadata retained
+   - Meets SOC 2 audit evidence requirements
+   - Marked with `_anonymized` timestamp in `detail_json`
+
+4. **Deletion** (Default: 1825 days / 5 years)
+   - Complete removal of audit log records
+   - Conservative default aligned with financial sector regulations
+   - Can be adjusted per organization or industry requirements
+
+#### Configuration
+
+Retention policies are stored in the database (`app_core.retention_policy`), not environment variables, enabling:
+- **Runtime reconfiguration** without code redeployment
+- **Organization-specific policies** (e.g., finance: 10 years, general: 5 years)
+- **Audit trail** of policy changes in `retention_policy_history`
+- **Administrative UI** for policy management (future)
+
+**System Default Policy:**
+```sql
+-- Conservative baseline (can be overridden per organization)
+full_retention_days:  180   -- 6 months
+partial_anon_days:    365   -- 1 year (PCI DSS)
+full_anon_days:       1095  -- 3 years (SOC 2)
+deletion_days:        1825  -- 5 years (financial regulations)
+```
+
+**Industry-Specific Recommendations:**
+- **General SaaS**: Use system defaults (180/365/1095/1825 days)
+- **Finance/Payment**: Extend to 365/730/2190/3650 days (10 years)
+- **Healthcare**: Follow HIPAA guidelines (typically 6-7 years)
+- **Public Sector**: Consult jurisdiction-specific regulations
+
+#### Access Control
+
+- **General users**: Cannot access PII fields in audit logs
+- **Auditors/Admins**: Full access during retention periods
+- **Implementation**: Role-based filtering in `getAuditLogs()` (future enhancement)
+
+#### Applying Retention Policies
+
+```typescript
+// Automated: Run as scheduled cron job (e.g., daily at 2 AM)
+import { applyAuditRetentionPolicy } from './modules/audit/repository';
+
+// Apply to all organizations
+await applyAuditRetentionPolicy();
+
+// Apply to specific organization
+await applyAuditRetentionPolicy(orgUuid);
+```
+
+**Returns:**
+```typescript
+{
+  deleted: number,           // Records completely removed
+  fullAnonymized: number,    // Records with all PII removed
+  partialAnonymized: number  // Records with hashed IPs
+}
+```
+
+#### Policy Management
+
+```typescript
+// Update retention policy (creates audit trail)
+await upsertRetentionPolicy({
+  org_uuid: 'optional-org-uuid',  // null = system default
+  policy_name: 'Custom Policy',
+  target_table: 'audit_log',
+  full_retention_days: 180,
+  partial_anon_days: 365,
+  full_anon_days: 1095,
+  deletion_days: 1825,
+  changed_by: 'admin-user-uuid',
+  change_reason: 'Compliance requirement update'
+});
+```
+
+**Audit Trail**: All policy changes recorded in `retention_policy_history` with old/new values.
+
+#### Best Practices
+
+1. **Start Conservative**: Use system defaults (5 years deletion), reduce after risk assessment
+2. **Document Rationale**: Record `change_reason` when modifying policies
+3. **Regular Review**: Audit policy effectiveness quarterly
+4. **Balance Trade-offs**: Security investigation needs vs. privacy requirements vs. storage costs
+5. **Legal Counsel**: Consult legal team for industry-specific retention requirements
+6. **Stable Salt**: Use `AUDIT_IP_HASH_SALT` (separate from `ENCRYPTION_KEY`) to ensure IP hash consistency even if encryption keys are rotated
+7. **Performance**: Run `applyAuditRetentionPolicy()` during off-peak hours for large datasets
 
 ## Secrets Management
 
@@ -212,6 +319,13 @@ app.post('/api/responses/run', {
 - Session secrets: Rotate every 90 days
 - API keys: Rotate per vendor recommendation
 - Database passwords: Rotate every 180 days
+- Audit IP hash salt: **Generally do not rotate** (breaks IP correlation analysis)
+  - If rotation is necessary (e.g., salt compromise):
+    1. Create new salt in environment
+    2. Add `detail_json` field marking which salt version was used
+    3. Update hashing logic to check salt version
+    4. Re-hash affected logs during off-peak hours
+    5. Document migration in retention policy change log
 
 ## Database Security
 

@@ -125,6 +125,31 @@ export interface UserSession {
   last_used: Date;
 }
 
+export interface RetentionPolicy {
+  policy_uuid: string;
+  org_uuid: string | null;
+  policy_name: string;
+  target_table: string;
+  full_retention_days: number;
+  partial_anon_days: number;
+  full_anon_days: number;
+  deletion_days: number;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface RetentionPolicyHistory {
+  history_uuid: string;
+  policy_uuid: string;
+  changed_by: string;
+  old_values: Record<string, unknown>;
+  new_values: Record<string, unknown>;
+  change_reason: string | null;
+  created_at: Date;
+}
+
 // OIDC types
 export interface OidcConfig {
   issuer: string;
@@ -339,6 +364,7 @@ export interface AppConfig {
     session_cleanup_interval_seconds: number;
     rate_limit_max: number;
     rate_limit_window_ms: number;
+    audit_ip_hash_salt: string;
   };
   encryption: {
     key: string;
