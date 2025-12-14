@@ -96,6 +96,11 @@ export function decrypt(encryptedData: string): string {
  * Encrypts a JSON object
  */
 export function encryptJson(obj: Record<string, unknown>): string {
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) {
+      throw new Error(`Cannot encrypt object: property "${key}" is undefined. Properties with undefined values are not supported.`);
+    }
+  }
   return encrypt(JSON.stringify(obj));
 }
 
