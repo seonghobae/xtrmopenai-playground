@@ -69,6 +69,13 @@ and `mcp_execution_user_idx` could potentially be considered redundant given the
 `mcp_execution_org_idx` and `mcp_execution_user_idx` show zero or very low `idx_scan` counts
 while their composite counterparts are heavily used, consider removing them in a future optimization PR.
 
+**Follow-up Action Required:** Create a GitHub issue to track evaluation of these pre-existing
+indexes after production metrics are available. The issue should:
+- Monitor `pg_stat_user_indexes` for 30+ days in production
+- Compare usage patterns of single-column vs composite indexes
+- Assess whether `mcp_execution_org_idx` and `mcp_execution_user_idx` can be safely removed
+- Document decision with performance data
+
 ## Addressing Reviewer Concerns
 
 ### 1. ✅ Document COUNT(*) Strategy for Filter-less Calls

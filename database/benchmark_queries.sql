@@ -1,6 +1,13 @@
 -- Benchmark queries for mcp_execution table
 -- These queries demonstrate the effectiveness of the composite indexes
 -- Run with EXPLAIN ANALYZE to see execution plans and actual performance
+--
+-- IMPORTANT: Replace hardcoded UUID values with actual values from your database
+-- The UUIDs below (00000000-0000-0000-0000-000000000001, etc.) are placeholders.
+-- To get actual UUIDs from your database, run:
+--   SELECT org_uuid FROM app_core.org_unit LIMIT 1;
+--   SELECT user_uuid FROM app_core.user_account LIMIT 1;
+--   SELECT tool_uuid FROM app_core.mcp_tool LIMIT 1;
 
 -- Setup: Create test data (optional, for benchmarking)
 -- Uncomment to generate sample data:
