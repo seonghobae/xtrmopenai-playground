@@ -339,7 +339,7 @@ export async function getMcpExecutions(params: {
     );
     
     if (!estimateResult.rows.length) {
-      throw new Error(`Unable to retrieve table statistics for ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}`);
+      throw new Error(`Table "${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}" not found in pg_class/pg_namespace`);
     }
     
     const estimate = parseInt(estimateResult.rows[0].estimate, 10);
