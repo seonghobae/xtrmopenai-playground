@@ -136,7 +136,18 @@ export async function createSession(
 }
 
 /**
- * Get session by key
+ * Get session by key with real-time inactivity enforcement
+ * 
+ * Security: This function enforces BOTH absolute TTL (expires_at) AND inactivity timeout
+ * (last_used) directly in the WHERE clause at every request, not just during cleanup.
+ * This ensures expired sessions are rejected immediately, meeting AAL2 requirements.
+ * 
+ * The WHERE conditions:
+ * - expires_at > now() : Absolute session TTL check (SESSION_TTL_SECONDS)
+ * - last_used >= $2   : Inactivity timeout check (SESSION_INACTIVITY_SECONDS)
+ * 
+ * Scheduled cleanup (deleteExpiredSessions) removes stale records from DB but is NOT
+ * relied upon for security - sessions are validated fresh on every authenticated request.
  */
 export async function getSessionByKey(sessionKey: string): Promise<UserSession | null> {
   const inactivityCutoff = new Date(

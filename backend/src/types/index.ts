@@ -92,6 +92,22 @@ export interface StreamEvent {
   created_at: Date;
 }
 
+/**
+ * Audit log entry for security-relevant actions
+ * 
+ * PII Handling Strategy:
+ * - ip_addr, user_agent, and detail_json may contain PII
+ * - NOT masked at runtime (impractical for multilingual LLM responses)
+ * - Access controlled via RBAC (general users cannot view PII fields)
+ * - Progressive anonymization via multi-tier retention policies:
+ *   1. Full retention (default 180 days)
+ *   2. Partial anonymization (default 365 days) - IP hashed, user_agent kept
+ *   3. Full anonymization (default 1095 days) - All PII removed
+ *   4. Deletion (default 1825 days) - Complete removal
+ * 
+ * See docs/SECURITY.md "PII and Retention Policy" section for details.
+ * See backend/src/modules/audit/repository.ts applyAuditRetentionPolicy()
+ */
 export interface AuditLog {
   log_uuid: string;
   org_uuid: string | null;
@@ -100,9 +116,9 @@ export interface AuditLog {
   target_type: string | null;
   target_id: string | null;
   result_code: string;
-  detail_json: Record<string, unknown>;
-  ip_addr: string | null;
-  user_agent: string | null;
+  detail_json: Record<string, unknown>; // May contain PII - access controlled by RBAC
+  ip_addr: string | null;               // PII - subject to retention policy anonymization
+  user_agent: string | null;            // PII - subject to retention policy anonymization
   created_at: Date;
 }
 
@@ -125,11 +141,28 @@ export interface UserSession {
   last_used: Date;
 }
 
+/**
+ * Multi-tier retention policy for progressive data anonymization
+ * 
+ * Addresses regulatory requirements (PCI DSS, SOC 2, financial regulations)
+ * while balancing security investigation needs with privacy requirements.
+ * 
+ * Policy tiers (must satisfy: full <= partial <= full_anon <= deletion):
+ * - full_retention_days: Complete data including PII (default 180 days)
+ * - partial_anon_days: IP hashed, user_agent kept (default 365 days, PCI DSS)
+ * - full_anon_days: All PII removed (default 1095 days, SOC 2)
+ * - deletion_days: Complete removal (default 1825 days, financial sector)
+ * 
+ * Configurable per organization or as system default (org_uuid = NULL).
+ * Changes tracked in retention_policy_history for audit trail.
+ * 
+ * See docs/SECURITY.md "Multi-Tier Retention Strategy" section.
+ */
 export interface RetentionPolicy {
   policy_uuid: string;
-  org_uuid: string | null;
+  org_uuid: string | null;  // NULL = system default, else org-specific
   policy_name: string;
-  target_table: string;
+  target_table: string;     // 'audit_log', 'response_run', 'mcp_execution'
   full_retention_days: number;
   partial_anon_days: number;
   full_anon_days: number;
