@@ -147,6 +147,14 @@ export async function createSession(
     };
   } catch (err) {
     logger.error({ err, session_uuid: sessionRow.session_uuid }, 'Failed to decrypt session tokens');
+    try {
+      await query(
+        `DELETE FROM app_core.user_session WHERE session_uuid = $1`,
+        [sessionRow.session_uuid]
+      );
+    } catch (deleteErr) {
+      logger.error({ deleteErr, session_uuid: sessionRow.session_uuid }, 'Failed to delete orphaned session after decryption failure');
+    }
     throw new Error('Failed to decrypt session tokens');
   }
 }
