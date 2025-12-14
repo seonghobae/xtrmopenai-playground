@@ -108,7 +108,7 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
   // Check if this looks like encrypted data
   if (!isEncrypted(encrypted)) {
     // Legacy plaintext data - return as-is for backward compatibility
-    logger.warn({ dataLength: encrypted.length }, 'Decrypting legacy plaintext data - migration needed');
+    logger.warn('Decrypting legacy plaintext data - migration needed');
     return encrypted;
   }
 
@@ -144,10 +144,7 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
   } catch (err) {
     // Decryption failed - this might be corrupted data or invalid encryption
     // Return plaintext as fallback for edge cases
-    logger.warn(
-      { error: err instanceof Error ? err.message : 'Unknown error', dataLength: encrypted.length },
-      'Decryption failed - returning original data (possible corruption or legacy format)'
-    );
+    logger.warn('Decryption failed - returning original data (possible corruption or legacy format)');
     return encrypted;
   }
 }
