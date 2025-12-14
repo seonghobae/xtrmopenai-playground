@@ -44,6 +44,9 @@ const server = Fastify({
   trustProxy: true,
 });
 
+// Session cleanup scheduler
+let sessionCleanupInterval: NodeJS.Timeout | null = null;
+
 /**
  * Register plugins
  */
@@ -341,6 +344,23 @@ async function start() {
       port: config.server.port,
     });
 
+    // Start session cleanup scheduler
+    const { deleteExpiredSessions } = await import('./modules/auth/repository.js');
+    const cleanupIntervalMs = config.security.session_cleanup_interval_seconds * 1000;
+    
+    sessionCleanupInterval = setInterval(async () => {
+      try {
+        await deleteExpiredSessions();
+      } catch (err) {
+        logger.error({ err }, 'Session cleanup failed');
+      }
+    }, cleanupIntervalMs);
+    
+    logger.info(
+      { intervalSeconds: config.security.session_cleanup_interval_seconds },
+      'Session cleanup scheduler started'
+    );
+
     logger.info(
       {
         host: config.server.host,
@@ -361,6 +381,13 @@ async function shutdown() {
   logger.info('Shutting down server...');
 
   try {
+    // Stop session cleanup scheduler
+    if (sessionCleanupInterval) {
+      clearInterval(sessionCleanupInterval);
+      sessionCleanupInterval = null;
+      logger.info('Session cleanup scheduler stopped');
+    }
+
     await server.close();
     await closePool();
     logger.info('Server shut down gracefully');

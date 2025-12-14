@@ -336,6 +336,7 @@ export interface AppConfig {
     session_secret: string;
     session_ttl_seconds: number;
     session_inactivity_seconds: number;
+    session_cleanup_interval_seconds: number;
     rate_limit_max: number;
     rate_limit_window_ms: number;
   };
