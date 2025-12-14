@@ -6,6 +6,7 @@
 import { query } from '../../utils/database.js';
 import type { AuditLog, RetentionPolicy } from '../../types/index.js';
 import { logger } from '../../utils/logger.js';
+import { config } from '../../config/index.js';
 
 export interface CreateAuditLogParams {
   org_uuid?: string;
@@ -138,6 +139,7 @@ export async function getAuditLogs(params: {
 
 /**
  * Get active retention policy for a target table and optional organization
+ * First checks for org-specific policy, then falls back to system default (org_uuid = NULL)
  */
 export async function getRetentionPolicy(
   targetTable: string,
@@ -146,7 +148,7 @@ export async function getRetentionPolicy(
   const result = await query<RetentionPolicy>(
     `SELECT * FROM app_core.retention_policy
      WHERE target_table = $1
-       AND (org_uuid = $2 OR (org_uuid IS NULL AND $2 IS NULL))
+       AND (org_uuid = $2 OR org_uuid IS NULL)
        AND is_active = true
      ORDER BY org_uuid NULLS LAST
      LIMIT 1`,
@@ -208,11 +210,12 @@ export async function applyAuditRetentionPolicy(
   stats.fullAnonymized = fullAnonResult.rowCount || 0;
 
   // Step 3: Partial anonymization (hash IP, keep user_agent for security analysis)
+  // Use HMAC for secure hashing with encryption key as secret
   const partialAnonResult = await query(
     `UPDATE app_core.audit_log
      SET ip_addr = CASE
          WHEN ip_addr IS NOT NULL THEN
-           substring(encode(digest(ip_addr::text || 'salt', 'sha256'), 'hex'), 1, 16)
+           substring(encode(hmac(ip_addr::text, $4, 'sha256'), 'hex'), 1, 16)
          ELSE NULL
        END,
          detail_json = jsonb_set(
@@ -225,7 +228,7 @@ export async function applyAuditRetentionPolicy(
        AND (org_uuid = $3 OR $3 IS NULL)
        AND ip_addr IS NOT NULL
        AND NOT (detail_json ? '_partial_anonymized')`,
-    [policy.partial_anon_days, policy.full_anon_days, orgUuid || null]
+    [policy.partial_anon_days, policy.full_anon_days, orgUuid || null, config.encryption.key]
   );
   stats.partialAnonymized = partialAnonResult.rowCount || 0;
 
