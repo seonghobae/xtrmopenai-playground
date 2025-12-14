@@ -188,10 +188,28 @@ export async function getSessionByKey(sessionKey: string): Promise<UserSession |
       token_json: decryptJson(sessionRow.token_json),
     };
   } catch (err) {
-    logger.error({ err, session_uuid: sessionRow.session_uuid }, 'Failed to decrypt session tokens');
-    throw new Error(
-      `Failed to decrypt session tokens: session data may be corrupted, encryption key may have changed, or data may be malformed. Original error: ${err instanceof Error ? err.message : String(err)}`
+    // Handle decryption failures gracefully (e.g., legacy plaintext sessions, corrupted data, key changes)
+    logger.warn(
+      { err, session_uuid: sessionRow.session_uuid, session_key: sessionKey },
+      'Failed to decrypt session tokens - treating as invalid session'
     );
+    
+    // Clean up the corrupted/legacy session
+    try {
+      await query(
+        `DELETE FROM app_core.user_session WHERE session_uuid = $1`,
+        [sessionRow.session_uuid]
+      );
+      logger.info({ session_uuid: sessionRow.session_uuid }, 'Deleted legacy/corrupted session');
+    } catch (deleteErr) {
+      logger.error(
+        { deleteErr, session_uuid: sessionRow.session_uuid },
+        'Failed to delete legacy/corrupted session'
+      );
+    }
+    
+    // Return null to trigger re-authentication (401) instead of 500 error
+    return null;
   }
 }
 
