@@ -162,8 +162,13 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
       if (iterations < PBKDF2_ITERATIONS_MIN || iterations > PBKDF2_ITERATIONS_MAX) {
         throw new Error(`Invalid iteration count: ${iterations} (must be between ${PBKDF2_ITERATIONS_MIN} and ${PBKDF2_ITERATIONS_MAX})`);
       }
+    } else {
+      // V0 format (legacy) - validate minimum length
+      const minLengthV0 = SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH + 1;
+      if (combined.length < minLengthV0) {
+        throw new Error('Invalid v0 encrypted data: buffer too short');
+      }
     }
-    // else: V0 format (legacy) - offset stays at 0, iterations already set to legacy value
     
     // Extract components based on offset
     const salt = combined.subarray(offset, offset + SALT_LENGTH);
@@ -173,6 +178,11 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
       offset + SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH
     );
     const ciphertext = combined.subarray(offset + SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH);
+    
+    // Validate extracted component lengths
+    if (salt.length !== SALT_LENGTH || iv.length !== IV_LENGTH || authTag.length !== AUTH_TAG_LENGTH) {
+      throw new Error('Invalid encrypted data: malformed component lengths');
+    }
     
     // Derive key from master key using salt with the appropriate iteration count
     const key = await deriveKey(salt, masterKey, iterations);
