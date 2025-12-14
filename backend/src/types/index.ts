@@ -125,6 +125,16 @@ export interface UserSession {
   last_used: Date;
 }
 
+export interface UserSessionRow {
+  session_uuid: string;
+  user_uuid: string;
+  session_key: string;
+  token_json: string; // Encrypted TEXT column
+  expires_at: Date;
+  created_at: Date;
+  last_used: Date;
+}
+
 // OIDC types
 export interface OidcConfig {
   issuer: string;

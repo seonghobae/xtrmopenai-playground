@@ -8,6 +8,7 @@ import { config } from '../../config/index.js';
 import type {
   UserAccount,
   UserSession,
+  UserSessionRow,
   AuthenticatedUser,
 } from '../../types/index.js';
 import { logger } from '../../utils/logger.js';
@@ -126,7 +127,7 @@ export async function createSession(
   // Encrypt tokens before storing
   const encryptedTokens = encryptJson(tokenJson);
   
-  const result = await query<UserSession>(
+  const result = await query<UserSessionRow>(
     `INSERT INTO app_core.user_session (user_uuid, session_key, token_json, expires_at)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
@@ -138,14 +139,14 @@ export async function createSession(
   }
 
   // Decrypt tokens in the returned session
-  const session = result.rows[0];
+  const sessionRow = result.rows[0];
   try {
     return {
-      ...session,
-      token_json: decryptJson(session.token_json as unknown as string),
+      ...sessionRow,
+      token_json: decryptJson(sessionRow.token_json),
     };
   } catch (err) {
-    logger.error({ err, session_uuid: session.session_uuid }, 'Failed to decrypt session tokens');
+    logger.error({ err, session_uuid: sessionRow.session_uuid }, 'Failed to decrypt session tokens');
     throw new Error('Failed to decrypt session tokens');
   }
 }
@@ -159,7 +160,7 @@ export async function getSessionByKey(sessionKey: string): Promise<UserSession |
     Date.now() - config.security.session_inactivity_seconds * 1000
   );
 
-  const result = await query<UserSession>(
+  const result = await query<UserSessionRow>(
     `SELECT * FROM app_core.user_session
      WHERE session_key = $1
        AND expires_at > now()
@@ -167,19 +168,19 @@ export async function getSessionByKey(sessionKey: string): Promise<UserSession |
     [sessionKey, inactivityCutoff]
   );
 
-  const session = result.rows[0];
-  if (!session) {
+  const sessionRow = result.rows[0];
+  if (!sessionRow) {
     return null;
   }
 
   // Decrypt tokens before returning
   try {
     return {
-      ...session,
-      token_json: decryptJson(session.token_json as unknown as string),
+      ...sessionRow,
+      token_json: decryptJson(sessionRow.token_json),
     };
   } catch (err) {
-    logger.error({ err, session_uuid: session.session_uuid }, 'Failed to decrypt session tokens');
+    logger.error({ err, session_uuid: sessionRow.session_uuid }, 'Failed to decrypt session tokens');
     throw new Error('Failed to decrypt session tokens');
   }
 }

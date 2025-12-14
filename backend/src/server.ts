@@ -331,7 +331,10 @@ async function setupSessionCleanup() {
   const intervalMs = config.security.session_cleanup_interval_seconds * 1000;
   sessionCleanupInterval = setInterval(async () => {
     try {
-      await deleteExpiredSessions();
+      const deletedCount = await deleteExpiredSessions();
+      if (deletedCount > 0) {
+        logger.info({ deletedCount }, 'Scheduled session cleanup completed');
+      }
     } catch (err) {
       logger.error({ err }, 'Scheduled session cleanup failed');
     }

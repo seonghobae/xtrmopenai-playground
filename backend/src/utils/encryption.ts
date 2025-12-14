@@ -101,15 +101,26 @@ export function encryptJson(obj: Record<string, unknown>): string {
 
 /**
  * Decrypts and parses a JSON object
+ * Validates that the result is actually an object
  */
 export function decryptJson(encryptedData: string): Record<string, unknown> {
   const decrypted = decrypt(encryptedData);
   
+  let parsed: unknown;
   try {
-    return JSON.parse(decrypted) as Record<string, unknown>;
+    parsed = JSON.parse(decrypted);
   } catch (err) {
     throw new Error(
       `Failed to parse decrypted data as JSON: ${err instanceof Error ? err.message : String(err)}`
     );
   }
+  
+  // Validate that the result is an object (not null, array, or primitive)
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      `Decrypted JSON is not an object (got ${Array.isArray(parsed) ? 'array' : typeof parsed})`
+    );
+  }
+  
+  return parsed as Record<string, unknown>;
 }
