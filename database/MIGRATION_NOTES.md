@@ -29,7 +29,7 @@ The composite indexes provide better performance when queries include `ORDER BY 
 Each index adds approximately 5-10% overhead to INSERT operations. By removing two redundant indexes:
 - **Before:** 6 indexes on mcp_execution (excluding PK)
 - **After:** 4 indexes on mcp_execution (excluding PK)
-- **Impact:** ~10-20% reduction in write overhead
+- **Impact:** ~12-14% reduction in write overhead
 
 #### 3. Query Pattern Analysis
 
