@@ -189,7 +189,9 @@ export async function getSessionByKey(sessionKey: string): Promise<UserSession |
     };
   } catch (err) {
     logger.error({ err, session_uuid: sessionRow.session_uuid }, 'Failed to decrypt session tokens');
-    throw new Error('Failed to decrypt session tokens');
+    throw new Error(
+      `Failed to decrypt session tokens: session data may be corrupted, encryption key may have changed, or data may be malformed. Original error: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 }
 
