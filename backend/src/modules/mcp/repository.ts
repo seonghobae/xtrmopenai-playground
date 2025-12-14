@@ -339,14 +339,14 @@ export async function getMcpExecutions(params: {
     );
     
     if (!estimateResult.rows[0]) {
-      throw new Error(`Table ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE} not found in pg_class`);
+      throw new Error('Unable to retrieve table statistics');
     }
     
     const estimate = parseInt(estimateResult.rows[0].estimate, 10);
     
-    // If reltuples is negative (table never analyzed), fall back to exact COUNT(*)
+    // If reltuples is negative (table never analyzed) or invalid, fall back to exact COUNT(*)
     // Note: 0 is a valid estimate for empty tables
-    if (estimate < 0) {
+    if (isNaN(estimate) || estimate < 0) {
       const countResult = await query<{ count: string }>(
         `SELECT COUNT(*) as count FROM ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}`,
         []
