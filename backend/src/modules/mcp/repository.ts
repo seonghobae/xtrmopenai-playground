@@ -7,6 +7,10 @@ import { query } from '../../utils/database.js';
 import { encrypt, decrypt } from '../../utils/encryption.js';
 import type { McpServer, McpTool, McpExecution } from '../../types/index.js';
 
+// Constants for database schema and table names
+const MCP_SCHEMA = 'app_core';
+const MCP_EXECUTION_TABLE = 'mcp_execution';
+
 /**
  * Validate allow_domain is a non-empty array
  */
@@ -247,7 +251,7 @@ export async function createMcpExecution(params: {
   error_text?: string;
 }): Promise<McpExecution> {
   const result = await query<McpExecution>(
-    `INSERT INTO app_core.mcp_execution
+    `INSERT INTO ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}
      (tool_uuid, org_uuid, user_uuid, params_json, result_json, status_text, duration_ms, error_text)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
@@ -323,16 +327,27 @@ export async function getMcpExecutions(params: {
   let total: number;
   if (conditions.length === 0) {
     // Use pg_class.reltuples for fast estimated count when no filters
+    // Note: reltuples is an estimate updated by VACUUM/ANALYZE and may be stale.
+    // It returns -1 for tables that have never been analyzed. For large tables
+    // without filters, this provides much better performance than COUNT(*).
     const estimateResult = await query<{ estimate: string }>(
       `SELECT reltuples::bigint as estimate 
        FROM pg_class 
-       WHERE relname = 'mcp_execution' AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'app_core')`
+       WHERE relname = $1 AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = $2)`,
+      [MCP_EXECUTION_TABLE, MCP_SCHEMA]
     );
-    total = parseInt(estimateResult.rows[0]?.estimate || '0', 10);
+    
+    if (!estimateResult.rows[0]) {
+      throw new Error(`Table ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE} not found in pg_class`);
+    }
+    
+    const estimate = parseInt(estimateResult.rows[0].estimate, 10);
+    // If reltuples is -1 (table never analyzed) or negative, fall back to exact count
+    total = estimate >= 0 ? estimate : 0;
   } else {
-    // Use exact COUNT(*) when filters are applied
+    // Use exact COUNT(*) when filters are applied for accuracy
     const countResult = await query<{ count: string }>(
-      `SELECT COUNT(*) as count FROM app_core.mcp_execution ${whereClause}`,
+      `SELECT COUNT(*) as count FROM ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE} ${whereClause}`,
       values
     );
     total = parseInt(countResult.rows[0]?.count || '0', 10);
@@ -342,7 +357,7 @@ export async function getMcpExecutions(params: {
   const offset = params.offset || 0;
 
   const itemsResult = await query<McpExecution>(
-    `SELECT * FROM app_core.mcp_execution
+    `SELECT * FROM ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}
      ${whereClause}
      ORDER BY created_at DESC
      LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
@@ -381,7 +396,7 @@ export async function getMcpToolStats(toolUuid: string, hours: number = 24): Pro
        COUNT(*) FILTER (WHERE status_text = 'timeout') as timeout,
        AVG(duration_ms) as avg_duration_ms,
        PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms) as p95_duration_ms
-     FROM app_core.mcp_execution
+     FROM ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}
      WHERE tool_uuid = $1 AND created_at >= now() - interval '1 hour' * $2`,
     [toolUuid, hours]
   );
