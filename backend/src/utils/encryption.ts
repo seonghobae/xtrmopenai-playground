@@ -18,9 +18,10 @@ const LEGACY_WARNING_CACHE_MAX_SIZE = 1000;
 const CACHE_CLEAR_INTERVAL_MS = 24 * 60 * 60 * 1000; // Clear cache daily
 
 // Periodic cache clearing to prevent memory leaks in long-running processes
+// unref() allows process to exit cleanly without waiting for this timer
 setInterval(() => {
   legacyDataWarningCache.clear();
-}, CACHE_CLEAR_INTERVAL_MS);
+}, CACHE_CLEAR_INTERVAL_MS).unref();
 
 /**
  * Derive encryption key from the master key using PBKDF2
@@ -124,6 +125,7 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
     const cacheKey = `legacy_${hash}`;
     if (!legacyDataWarningCache.has(cacheKey)) {
       // Evict oldest entry before adding new one to maintain size limit
+      // Note: Set iteration order is guaranteed to be insertion order in ES6+
       if (legacyDataWarningCache.size >= LEGACY_WARNING_CACHE_MAX_SIZE) {
         const firstKey = legacyDataWarningCache.values().next().value;
         legacyDataWarningCache.delete(firstKey);
