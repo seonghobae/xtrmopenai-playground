@@ -139,15 +139,17 @@ async function registerRoutes() {
     const loginQuery = request.query as { return_to?: string };
     const returnTo = typeof loginQuery?.return_to === 'string' ? loginQuery.return_to : undefined;
 
-    reply.setCookie('oidc_state', state, { httpOnly: true, secure: isProduction, maxAge: 600 });
-    reply.setCookie('oidc_nonce', nonce, { httpOnly: true, secure: isProduction, maxAge: 600 });
-    reply.setCookie('oidc_verifier', codeVerifier, { httpOnly: true, secure: isProduction, maxAge: 600 });
+    reply.setCookie('oidc_state', state, { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/', signed: true, maxAge: 600 });
+    reply.setCookie('oidc_nonce', nonce, { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/', signed: true, maxAge: 600 });
+    reply.setCookie('oidc_verifier', codeVerifier, { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/', signed: true, maxAge: 600 });
 
     if (returnTo) {
       reply.setCookie(OIDC_RETURN_URL_COOKIE, returnTo, {
         httpOnly: true,
         secure: isProduction,
         sameSite: 'lax',
+        path: '/',
+        signed: true,
         maxAge: 600,
       });
     } else {
@@ -166,17 +168,20 @@ async function registerRoutes() {
     }
 
     // Verify state
-    const storedState = request.cookies.oidc_state;
-    if (state !== storedState) {
+    const storedStateResult = request.unsignCookie(request.cookies.oidc_state || '');
+    if (!storedStateResult.valid || state !== storedStateResult.value) {
       return reply.status(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'State mismatch' } });
     }
 
-    const codeVerifier = request.cookies.oidc_verifier;
-    const nonce = request.cookies.oidc_nonce;
+    const codeVerifierResult = request.unsignCookie(request.cookies.oidc_verifier || '');
+    const nonceResult = request.unsignCookie(request.cookies.oidc_nonce || '');
 
-    if (!codeVerifier || !nonce) {
+    if (!codeVerifierResult.valid || !nonceResult.valid || !codeVerifierResult.value || !nonceResult.value) {
       return reply.status(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'Missing PKCE verifier or nonce' } });
     }
+
+    const codeVerifier = codeVerifierResult.value;
+    const nonce = nonceResult.value;
 
     const { exchangeCodeForTokens, verifyIdToken } = await import('./modules/auth/oidc.js');
     const { upsertUserAccount, createSession } = await import('./modules/auth/repository.js');
@@ -208,6 +213,8 @@ async function registerRoutes() {
         httpOnly: true,
         secure: isProduction,
         sameSite: 'lax',
+        path: '/',
+        signed: true,
         maxAge: config.security.session_ttl_seconds,
       });
 
@@ -215,7 +222,8 @@ async function registerRoutes() {
       reply.clearCookie('oidc_state');
       reply.clearCookie('oidc_nonce');
       reply.clearCookie('oidc_verifier');
-      const requestedRedirect = request.cookies[OIDC_RETURN_URL_COOKIE];
+      const returnUrlResult = request.unsignCookie(request.cookies[OIDC_RETURN_URL_COOKIE] || '');
+      const requestedRedirect = returnUrlResult.valid ? returnUrlResult.value : undefined;
       reply.clearCookie(OIDC_RETURN_URL_COOKIE);
 
       // Audit log
@@ -243,9 +251,9 @@ async function registerRoutes() {
     const { deleteSession } = await import('./modules/auth/repository.js');
     const { createAuditLog, AuditAction, AuditResult } = await import('./modules/audit/repository.js');
 
-    const sessionKey = request.cookies.session_id;
-    if (sessionKey) {
-      await deleteSession(sessionKey);
+    const sessionKeyResult = request.unsignCookie(request.cookies.session_id || '');
+    if (sessionKeyResult.valid && sessionKeyResult.value) {
+      await deleteSession(sessionKeyResult.value);
     }
 
     reply.clearCookie('session_id');

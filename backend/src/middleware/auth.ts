@@ -31,9 +31,9 @@ export async function authenticate(
 ): Promise<void> {
   try {
     // Get session from cookie
-    const sessionKey = request.cookies.session_id;
+    const sessionKeyResult = request.unsignCookie(request.cookies.session_id || '');
 
-    if (!sessionKey) {
+    if (!sessionKeyResult.valid || !sessionKeyResult.value) {
       return reply.status(401).send({
         success: false,
         error: {
@@ -42,6 +42,8 @@ export async function authenticate(
         },
       });
     }
+
+    const sessionKey = sessionKeyResult.value;
 
     // Validate session
     const session = await getSessionByKey(sessionKey);
@@ -106,11 +108,13 @@ export async function optionalAuthenticate(
   _reply: FastifyReply
 ): Promise<void> {
   try {
-    const sessionKey = request.cookies.session_id;
+    const sessionKeyResult = request.unsignCookie(request.cookies.session_id || '');
 
-    if (!sessionKey) {
+    if (!sessionKeyResult.valid || !sessionKeyResult.value) {
       return;
     }
+
+    const sessionKey = sessionKeyResult.value;
 
     const session = await getSessionByKey(sessionKey);
     if (!session) {
