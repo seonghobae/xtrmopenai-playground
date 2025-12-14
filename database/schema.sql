@@ -155,13 +155,17 @@ CREATE INDEX mcp_tool_server_idx ON app_core.mcp_tool(mcp_uuid);
 CREATE INDEX mcp_execution_org_idx ON app_core.mcp_execution(org_uuid);
 CREATE INDEX mcp_execution_user_idx ON app_core.mcp_execution(user_uuid);
 CREATE INDEX mcp_execution_created_idx ON app_core.mcp_execution(created_at DESC);
-CREATE INDEX response_run_org_idx ON app_core.response_run(org_uuid);
-CREATE INDEX response_run_user_idx ON app_core.response_run(user_uuid);
-CREATE INDEX response_run_created_idx ON app_core.response_run(created_at DESC);
+
+-- response_run indexes: Optimized to avoid redundancy
+-- Composite indexes can serve single-column queries on leftmost columns (PostgreSQL B-tree index property)
+-- Partial indexes exclude NULL values to reduce index size
+-- Monitor index usage in production:
+--   SELECT * FROM pg_stat_user_indexes WHERE schemaname = 'app_core' AND relname = 'response_run';
+CREATE INDEX response_run_created_idx ON app_core.response_run(created_at DESC); -- Time-based queries without org/user filters
 CREATE INDEX idx_response_run_org_created ON app_core.response_run(org_uuid, created_at) WHERE org_uuid IS NOT NULL;
 CREATE INDEX idx_response_run_user_created ON app_core.response_run(user_uuid, created_at) WHERE user_uuid IS NOT NULL;
-CREATE INDEX idx_response_run_created ON app_core.response_run(created_at);
 CREATE INDEX idx_response_run_org_model_created ON app_core.response_run(org_uuid, model_name, created_at) WHERE org_uuid IS NOT NULL;
+
 CREATE INDEX stream_event_run_idx ON app_core.stream_event(run_uuid, sequence_num);
 CREATE INDEX audit_log_org_idx ON app_core.audit_log(org_uuid);
 CREATE INDEX audit_log_user_idx ON app_core.audit_log(user_uuid);
