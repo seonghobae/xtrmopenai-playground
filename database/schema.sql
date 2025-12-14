@@ -168,12 +168,28 @@ CREATE INDEX audit_log_user_idx ON app_core.audit_log(user_uuid);
 CREATE INDEX audit_log_created_idx ON app_core.audit_log(created_at DESC);
 CREATE INDEX user_session_user_idx ON app_core.user_session(user_uuid);
 CREATE INDEX user_session_expires_idx ON app_core.user_session(expires_at);
+-- mcp_execution indexes: Composite indexes support both filtered and single-column queries
+-- Note: Composite indexes (tool_uuid+created_at, status_text+created_at) serve dual purpose:
+-- 1. Efficiently handle filtered queries with ORDER BY created_at DESC
+-- 2. Can be used for queries filtering only on the first column (tool_uuid or status_text)
+-- Single-column indexes are redundant and have been removed to reduce write overhead.
 CREATE INDEX idx_mcp_execution_org_created ON app_core.mcp_execution(org_uuid, created_at) WHERE org_uuid IS NOT NULL;
 CREATE INDEX idx_mcp_execution_user_created ON app_core.mcp_execution(user_uuid, created_at) WHERE user_uuid IS NOT NULL;
-CREATE INDEX mcp_execution_tool_idx ON app_core.mcp_execution(tool_uuid);
-CREATE INDEX mcp_execution_status_idx ON app_core.mcp_execution(status_text);
 CREATE INDEX idx_mcp_execution_tool_created ON app_core.mcp_execution(tool_uuid, created_at) WHERE tool_uuid IS NOT NULL;
 CREATE INDEX idx_mcp_execution_status_created ON app_core.mcp_execution(status_text, created_at);
+
+-- Performance notes for mcp_execution queries:
+-- 1. Filter-less COUNT(*) queries: For queries without filters (e.g., total execution count),
+--    PostgreSQL must perform a sequential scan as no index can optimize an unconditional COUNT(*).
+--    Consider these strategies for production:
+--    a) Maintain a summary table updated via triggers for real-time counts
+--    b) Use approximate counts (pg_stat_user_tables.n_live_tup) for dashboard metrics
+--    c) Cache total counts with periodic refresh for non-critical use cases
+--    d) Add time-range filters (e.g., last 30 days) to make queries more selective
+-- 2. Query patterns: The getMcpExecutions() function typically includes filters (org_uuid,
+--    user_uuid, tool_uuid, status_text, date ranges), making the composite indexes effective.
+-- 3. Write overhead: Each index adds ~5-10% write overhead. The four composite indexes above
+--    provide the best balance between query performance and write cost for typical access patterns.
 
 -- Insert default model prices (example values, update with actual OpenAI pricing)
 INSERT INTO app_core.model_price (model_name, input_price, output_price) VALUES
