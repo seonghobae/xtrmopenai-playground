@@ -139,19 +139,21 @@ async function registerRoutes() {
     const loginQuery = request.query as { return_to?: string };
     const returnTo = typeof loginQuery?.return_to === 'string' ? loginQuery.return_to : undefined;
 
-    reply.setCookie('oidc_state', state, { httpOnly: true, secure: isProduction, maxAge: 600 });
-    reply.setCookie('oidc_nonce', nonce, { httpOnly: true, secure: isProduction, maxAge: 600 });
-    reply.setCookie('oidc_verifier', codeVerifier, { httpOnly: true, secure: isProduction, maxAge: 600 });
+    reply.setCookie('oidc_state', state, { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/', signed: true, maxAge: 600 });
+    reply.setCookie('oidc_nonce', nonce, { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/', signed: true, maxAge: 600 });
+    reply.setCookie('oidc_verifier', codeVerifier, { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/', signed: true, maxAge: 600 });
 
     if (returnTo) {
-      reply.setCookie(RETURN_URL_COOKIE, returnTo, {
+      reply.setCookie(OIDC_RETURN_URL_COOKIE, returnTo, {
         httpOnly: true,
         secure: isProduction,
         sameSite: 'lax',
+        path: '/',
+        signed: true,
         maxAge: 600,
       });
     } else {
-      reply.clearCookie(RETURN_URL_COOKIE);
+      reply.clearCookie(OIDC_RETURN_URL_COOKIE, { path: '/' });
     }
 
     const authUrl = await buildAuthorizationUrl(state, nonce, codeChallenge);
@@ -166,13 +168,17 @@ async function registerRoutes() {
     }
 
     // Verify state
-    const storedState = request.cookies.oidc_state;
+    const storedStateResult = request.unsignCookie(request.cookies.oidc_state || '');
+    const storedState = storedStateResult.valid ? storedStateResult.value : null;
     if (state !== storedState) {
       return reply.status(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'State mismatch' } });
     }
 
-    const codeVerifier = request.cookies.oidc_verifier;
-    const nonce = request.cookies.oidc_nonce;
+    const codeVerifierResult = request.unsignCookie(request.cookies.oidc_verifier || '');
+    const codeVerifier = codeVerifierResult.valid ? codeVerifierResult.value : null;
+    
+    const nonceResult = request.unsignCookie(request.cookies.oidc_nonce || '');
+    const nonce = nonceResult.valid ? nonceResult.value : null;
 
     if (!codeVerifier || !nonce) {
       return reply.status(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'Missing PKCE verifier or nonce' } });
@@ -208,15 +214,17 @@ async function registerRoutes() {
         httpOnly: true,
         secure: isProduction,
         sameSite: 'lax',
+        path: '/',
+        signed: true,
         maxAge: config.security.session_ttl_seconds,
       });
 
       // Clear temporary cookies
-      reply.clearCookie('oidc_state');
-      reply.clearCookie('oidc_nonce');
-      reply.clearCookie('oidc_verifier');
-      const requestedRedirect = request.cookies[RETURN_URL_COOKIE];
-      reply.clearCookie(RETURN_URL_COOKIE);
+      reply.clearCookie('oidc_state', { path: '/' });
+      reply.clearCookie('oidc_nonce', { path: '/' });
+      reply.clearCookie('oidc_verifier', { path: '/' });
+      const requestedRedirect = request.unsignCookie(request.cookies[OIDC_RETURN_URL_COOKIE] || '').value || undefined;
+      reply.clearCookie(OIDC_RETURN_URL_COOKIE, { path: '/' });
 
       // Audit log
       await createAuditLog({
@@ -243,12 +251,13 @@ async function registerRoutes() {
     const { deleteSession } = await import('./modules/auth/repository.js');
     const { createAuditLog, AuditAction, AuditResult } = await import('./modules/audit/repository.js');
 
-    const sessionKey = request.cookies.session_id;
+    const sessionCookieResult = request.unsignCookie(request.cookies.session_id || '');
+    const sessionKey = sessionCookieResult.valid ? sessionCookieResult.value : null;
     if (sessionKey) {
       await deleteSession(sessionKey);
     }
 
-    reply.clearCookie('session_id');
+    reply.clearCookie('session_id', { path: '/' });
 
     await createAuditLog({
       user_uuid: request.user.user_uuid,

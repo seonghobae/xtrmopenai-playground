@@ -31,7 +31,8 @@ export async function authenticate(
 ): Promise<void> {
   try {
     // Get session from cookie
-    const sessionKey = request.cookies.session_id;
+    const sessionCookieResult = request.unsignCookie(request.cookies.session_id || '');
+    const sessionKey = sessionCookieResult.valid ? sessionCookieResult.value : null;
 
     if (!sessionKey) {
       return reply.status(401).send({
@@ -106,7 +107,8 @@ export async function optionalAuthenticate(
   _reply: FastifyReply
 ): Promise<void> {
   try {
-    const sessionKey = request.cookies.session_id;
+    const sessionCookieResult = request.unsignCookie(request.cookies.session_id || '');
+    const sessionKey = sessionCookieResult.valid ? sessionCookieResult.value : null;
 
     if (!sessionKey) {
       return;
