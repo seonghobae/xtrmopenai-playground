@@ -22,6 +22,7 @@ const configSchema = z.object({
   DATABASE_USER: z.string().default('postgres'),
   DATABASE_PASSWORD: z.string(),
   DATABASE_MAX_CONNECTIONS: z.coerce.number().default(10),
+  DATABASE_SSL_ENABLED: z.string().optional().transform(val => val === 'true' || val === '1'),
   DATABASE_SSL_CA: z.string().optional(),
   DATABASE_SSL_CERT: z.string().optional(),
   DATABASE_SSL_KEY: z.string().optional(),
@@ -64,7 +65,7 @@ const env = envResult.data;
 const corsOrigins = env.CORS_ORIGIN.split(',').map(origin => origin.trim()).filter(Boolean);
 const defaultOrigin = corsOrigins[0] ?? 'http://localhost:5173';
 
-const sslConfig = env.DATABASE_HOST !== 'localhost'
+const sslConfig = env.DATABASE_SSL_ENABLED
   ? {
       rejectUnauthorized: true,
       ca: env.DATABASE_SSL_CA || undefined,
