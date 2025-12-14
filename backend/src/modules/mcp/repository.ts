@@ -250,6 +250,11 @@ export async function createMcpExecution(params: {
 
 /**
  * Get execution logs with pagination
+ * 
+ * Performance note: COUNT(*) queries without filters may experience performance
+ * degradation on large datasets. Monitoring is recommended in production environments.
+ * Composite indexes (tool_uuid+created_at, status_text+created_at, org_uuid+created_at,
+ * user_uuid+created_at) are in place to optimize filtered queries.
  */
 export async function getMcpExecutions(params: {
   tool_uuid?: string;
