@@ -41,7 +41,7 @@ export async function createMcpServer(params: {
       params.org_uuid,
       params.name_text,
       params.base_url,
-      encrypt(params.auth_header),
+      await encrypt(params.auth_header),
       params.allow_domain,
       params.timeout_ms || 30000,
       params.retry_count || 3,
@@ -56,7 +56,7 @@ export async function createMcpServer(params: {
   const server = result.rows[0];
   return {
     ...server,
-    auth_header: decrypt(server.auth_header),
+    auth_header: await decrypt(server.auth_header),
   };
 }
 
@@ -76,7 +76,7 @@ export async function getMcpServer(mcpUuid: string): Promise<McpServer | null> {
 
   return {
     ...server,
-    auth_header: decrypt(server.auth_header),
+    auth_header: await decrypt(server.auth_header),
   };
 }
 
@@ -91,10 +91,12 @@ export async function listMcpServers(orgUuid: string | null): Promise<McpServer[
     [orgUuid]
   );
 
-  return result.rows.map(server => ({
-    ...server,
-    auth_header: decrypt(server.auth_header),
-  }));
+  return Promise.all(
+    result.rows.map(async (server) => ({
+      ...server,
+      auth_header: await decrypt(server.auth_header),
+    }))
+  );
 }
 
 /**
@@ -125,7 +127,7 @@ export async function updateMcpServer(
 
   if (updates.auth_header !== undefined) {
     fields.push(`auth_header = $${paramIndex++}`);
-    values.push(encrypt(updates.auth_header));
+    values.push(await encrypt(updates.auth_header));
   }
 
   if (updates.allow_domain !== undefined) {
@@ -169,7 +171,7 @@ export async function updateMcpServer(
   const server = result.rows[0];
   return {
     ...server,
-    auth_header: decrypt(server.auth_header),
+    auth_header: await decrypt(server.auth_header),
   };
 }
 
