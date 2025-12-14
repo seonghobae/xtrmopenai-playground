@@ -15,6 +15,12 @@ const SALT_LENGTH = 32;
 // Rate limiting for legacy data warnings to prevent log flooding
 const legacyDataWarningCache = new Set<string>();
 const LEGACY_WARNING_CACHE_MAX_SIZE = 1000;
+const CACHE_CLEAR_INTERVAL_MS = 24 * 60 * 60 * 1000; // Clear cache daily
+
+// Periodic cache clearing to prevent memory leaks in long-running processes
+setInterval(() => {
+  legacyDataWarningCache.clear();
+}, CACHE_CLEAR_INTERVAL_MS);
 
 /**
  * Derive encryption key from the master key using PBKDF2
@@ -113,18 +119,18 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
   if (!isEncrypted(encrypted)) {
     // Legacy plaintext data - return as-is for backward compatibility
     // Rate-limit warnings to prevent log flooding
-    // Use hash to avoid exposing sensitive data in cache keys
-    const hash = crypto.createHash('sha256').update(encrypted).digest('hex');
+    // Use fast hash for cache key (not cryptographic, just for deduplication)
+    const hash = crypto.createHash('md5').update(encrypted).digest('hex');
     const cacheKey = `legacy_${hash}`;
     if (!legacyDataWarningCache.has(cacheKey)) {
-      logger.warn('Decrypting legacy plaintext data - migration needed');
-      legacyDataWarningCache.add(cacheKey);
-      
-      // Prevent cache from growing indefinitely by removing oldest entry (simple FIFO)
-      if (legacyDataWarningCache.size > LEGACY_WARNING_CACHE_MAX_SIZE) {
+      // Evict oldest entry before adding new one to maintain size limit
+      if (legacyDataWarningCache.size >= LEGACY_WARNING_CACHE_MAX_SIZE) {
         const firstKey = legacyDataWarningCache.values().next().value;
         legacyDataWarningCache.delete(firstKey);
       }
+      
+      logger.warn('Decrypting legacy plaintext data - migration needed');
+      legacyDataWarningCache.add(cacheKey);
     }
     return encrypted;
   }
