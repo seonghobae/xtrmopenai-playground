@@ -252,7 +252,15 @@ export async function createMcpExecution(params: {
  * Get execution logs with pagination
  * 
  * Performance note: COUNT(*) queries without filters may experience performance
- * degradation on large datasets. Monitoring is recommended in production environments.
+ * degradation on large datasets (>1,000,000 rows). Monitor query execution time and
+ * alert if >1s; track slow query count and planning time in logs.
+ * 
+ * Mitigation strategies:
+ * - Use approximate counts: SELECT reltuples FROM pg_class WHERE relname = $1
+ * - Require filtered queries or enforce LIMIT for unfiltered requests
+ * - Maintain summary tables or materialized views for analytics
+ * - Use indexed partial counts: SELECT COUNT(*) FROM table WHERE indexed_column = $1 AND created_at > $2
+ * 
  * Composite indexes (tool_uuid+created_at, status_text+created_at, org_uuid+created_at,
  * user_uuid+created_at) are in place to optimize filtered queries.
  */
