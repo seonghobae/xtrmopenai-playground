@@ -363,6 +363,7 @@ export interface AppConfig {
     session_inactivity_seconds: number;
     rate_limit_max: number;
     rate_limit_window_ms: number;
+    audit_ip_hash_salt: string;
   };
   encryption: {
     key: string;

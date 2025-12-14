@@ -299,6 +299,8 @@ await upsertRetentionPolicy({
 3. **Regular Review**: Audit policy effectiveness quarterly
 4. **Balance Trade-offs**: Security investigation needs vs. privacy requirements vs. storage costs
 5. **Legal Counsel**: Consult legal team for industry-specific retention requirements
+6. **Stable Salt**: Use `AUDIT_IP_HASH_SALT` (separate from `ENCRYPTION_KEY`) to ensure IP hash consistency even if encryption keys are rotated
+7. **Performance**: Run `applyAuditRetentionPolicy()` during off-peak hours for large datasets
 
 ## Secrets Management
 
@@ -317,6 +319,7 @@ await upsertRetentionPolicy({
 - Session secrets: Rotate every 90 days
 - API keys: Rotate per vendor recommendation
 - Database passwords: Rotate every 180 days
+- Audit IP hash salt: **Do not rotate** (breaks IP correlation analysis across retention periods)
 
 ## Database Security
 

@@ -161,6 +161,9 @@ export async function getRetentionPolicy(
 /**
  * Apply multi-tier retention policy to audit logs
  * Returns statistics on actions taken
+ * 
+ * Performance: Uses audit_log_created_idx index for efficient date filtering.
+ * For large datasets, consider running during off-peak hours.
  */
 export async function applyAuditRetentionPolicy(
   orgUuid?: string
@@ -210,12 +213,12 @@ export async function applyAuditRetentionPolicy(
   stats.fullAnonymized = fullAnonResult.rowCount || 0;
 
   // Step 3: Partial anonymization (hash IP, keep user_agent for security analysis)
-  // Use HMAC for secure hashing with encryption key as secret
+  // Use HMAC with dedicated stable salt (32 chars = 128 bits for adequate security)
   const partialAnonResult = await query(
     `UPDATE app_core.audit_log
      SET ip_addr = CASE
          WHEN ip_addr IS NOT NULL THEN
-           substring(encode(hmac(ip_addr::text, $4, 'sha256'), 'hex'), 1, 16)
+           substring(encode(hmac(ip_addr::text, $4, 'sha256'), 'hex'), 1, 32)
          ELSE NULL
        END,
          detail_json = jsonb_set(
@@ -228,7 +231,7 @@ export async function applyAuditRetentionPolicy(
        AND (org_uuid = $3 OR $3 IS NULL)
        AND ip_addr IS NOT NULL
        AND NOT (detail_json ? '_partial_anonymized')`,
-    [policy.partial_anon_days, policy.full_anon_days, orgUuid || null, config.encryption.key]
+    [policy.partial_anon_days, policy.full_anon_days, orgUuid || null, config.security.audit_ip_hash_salt]
   );
   stats.partialAnonymized = partialAnonResult.rowCount || 0;
 
@@ -290,7 +293,7 @@ export async function upsertRetentionPolicy(params: {
 
     result = updateResult.rows[0];
 
-    // Record change in history
+    // Record change in history (capture all relevant fields)
     await query(
       `INSERT INTO app_core.retention_policy_history
        (policy_uuid, changed_by, old_values, new_values, change_reason)
@@ -299,16 +302,22 @@ export async function upsertRetentionPolicy(params: {
         existing.policy_uuid,
         params.changed_by,
         {
+          policy_name: existing.policy_name,
+          target_table: existing.target_table,
           full_retention_days: existing.full_retention_days,
           partial_anon_days: existing.partial_anon_days,
           full_anon_days: existing.full_anon_days,
           deletion_days: existing.deletion_days,
+          is_active: existing.is_active,
         },
         {
+          policy_name: params.policy_name,
+          target_table: params.target_table,
           full_retention_days: params.full_retention_days,
           partial_anon_days: params.partial_anon_days,
           full_anon_days: params.full_anon_days,
           deletion_days: params.deletion_days,
+          is_active: true,
         },
         params.change_reason || null,
       ]

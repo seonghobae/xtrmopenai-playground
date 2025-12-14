@@ -42,6 +42,7 @@ const configSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000), // 1 minute
 
   ENCRYPTION_KEY: z.string().min(32),
+  AUDIT_IP_HASH_SALT: z.string().min(32),
 
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
@@ -104,6 +105,7 @@ export const config: AppConfig = {
     session_inactivity_seconds: env.SESSION_INACTIVITY_SECONDS,
     rate_limit_max: env.RATE_LIMIT_MAX,
     rate_limit_window_ms: env.RATE_LIMIT_WINDOW_MS,
+    audit_ip_hash_salt: env.AUDIT_IP_HASH_SALT,
   },
   encryption: {
     key: env.ENCRYPTION_KEY,
