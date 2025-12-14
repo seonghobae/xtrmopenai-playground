@@ -160,7 +160,7 @@ CREATE INDEX mcp_execution_created_idx ON app_core.mcp_execution(created_at DESC
 -- Composite indexes can serve single-column queries on leftmost columns (PostgreSQL B-tree index property)
 -- Partial indexes exclude NULL values to reduce index size
 -- Monitor index usage in production with: SELECT * FROM pg_stat_user_indexes WHERE schemaname = 'app_core' AND relname = 'response_run';
-CREATE INDEX response_run_created_idx ON app_core.response_run(created_at DESC);
+CREATE INDEX response_run_created_idx ON app_core.response_run(created_at DESC); -- For queries with no org/user filter or ORDER BY only
 CREATE INDEX idx_response_run_org_created ON app_core.response_run(org_uuid, created_at) WHERE org_uuid IS NOT NULL;
 CREATE INDEX idx_response_run_user_created ON app_core.response_run(user_uuid, created_at) WHERE user_uuid IS NOT NULL;
 CREATE INDEX idx_response_run_org_model_created ON app_core.response_run(org_uuid, model_name, created_at) WHERE org_uuid IS NOT NULL;
