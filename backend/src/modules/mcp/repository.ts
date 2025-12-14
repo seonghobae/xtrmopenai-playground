@@ -162,7 +162,7 @@ export async function deleteMcpServer(mcpUuid: string): Promise<void> {
     [mcpUuid]
   );
 
-  if (!result.rowCount || result.rowCount === 0) {
+  if (!result.rowCount) {
     throw new Error('MCP server not found');
   }
 }
