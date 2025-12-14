@@ -178,10 +178,16 @@ async function registerRoutes() {
     }
 
     const codeVerifierResult = request.unsignCookie(request.cookies.oidc_verifier || '');
-    const codeVerifier = codeVerifierResult.valid ? codeVerifierResult.value : null;
+    if (!codeVerifierResult.valid) {
+      return reply.status(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'Invalid verifier cookie signature' } });
+    }
+    const codeVerifier = codeVerifierResult.value;
     
     const nonceResult = request.unsignCookie(request.cookies.oidc_nonce || '');
-    const nonce = nonceResult.valid ? nonceResult.value : null;
+    if (!nonceResult.valid) {
+      return reply.status(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'Invalid nonce cookie signature' } });
+    }
+    const nonce = nonceResult.value;
 
     if (!codeVerifier || !nonce) {
       return reply.status(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'Missing PKCE verifier or nonce' } });
