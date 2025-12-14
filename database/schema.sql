@@ -208,6 +208,86 @@ CREATE TRIGGER mcp_server_updated BEFORE UPDATE ON app_core.mcp_server
 CREATE TRIGGER mcp_tool_updated BEFORE UPDATE ON app_core.mcp_tool
   FOR EACH ROW EXECUTE FUNCTION app_core.update_timestamp();
 
+-- Retention policy configuration (database-stored instead of environment variables)
+CREATE TABLE app_core.retention_policy (
+  policy_uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_uuid UUID REFERENCES app_core.org_unit(org_uuid) ON DELETE CASCADE,
+  -- NULL org_uuid = system default policy
+  
+  policy_name TEXT NOT NULL,
+  target_table TEXT NOT NULL, -- 'audit_log', 'response_run', 'mcp_execution', etc.
+  
+  -- Multi-tier retention periods (days)
+  full_retention_days INT NOT NULL DEFAULT 180,     -- Complete data retention (6 months)
+  partial_anon_days INT NOT NULL DEFAULT 365,       -- Partial anonymization (1 year)
+  full_anon_days INT NOT NULL DEFAULT 1095,         -- Full anonymization (3 years)
+  deletion_days INT NOT NULL DEFAULT 1825,          -- Complete deletion (5 years)
+  
+  -- Metadata
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_by UUID REFERENCES app_core.user_account(user_uuid),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  
+  CONSTRAINT retention_policy_order CHECK (
+    full_retention_days <= partial_anon_days AND
+    partial_anon_days <= full_anon_days AND
+    full_anon_days <= deletion_days
+  )
+);
+
+-- Only one active policy per org+table combination
+CREATE UNIQUE INDEX retention_policy_org_table_active 
+  ON app_core.retention_policy(org_uuid, target_table, is_active)
+  WHERE is_active = true;
+
+-- System default policies (org_uuid = NULL)
+CREATE UNIQUE INDEX retention_policy_system_default
+  ON app_core.retention_policy(target_table, is_active)
+  WHERE org_uuid IS NULL AND is_active = true;
+
+-- Retention policy change audit trail
+CREATE TABLE app_core.retention_policy_history (
+  history_uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  policy_uuid UUID NOT NULL REFERENCES app_core.retention_policy(policy_uuid),
+  changed_by UUID NOT NULL REFERENCES app_core.user_account(user_uuid),
+  old_values JSONB NOT NULL,
+  new_values JSONB NOT NULL,
+  change_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Insert system default retention policy for audit_log (conservative values)
+INSERT INTO app_core.retention_policy (
+  org_uuid, 
+  policy_name, 
+  target_table,
+  full_retention_days,
+  partial_anon_days,
+  full_anon_days,
+  deletion_days,
+  is_active
+) VALUES (
+  NULL,
+  'System Default - Audit Log',
+  'audit_log',
+  180,   -- 6 months full retention
+  365,   -- 1 year partial anonymization (PCI DSS)
+  1095,  -- 3 years full anonymization (SOC 2)
+  1825,  -- 5 years deletion (financial regulations)
+  true
+);
+
+-- Indexes for retention policy
+CREATE INDEX retention_policy_org_idx ON app_core.retention_policy(org_uuid);
+CREATE INDEX retention_policy_target_idx ON app_core.retention_policy(target_table);
+CREATE INDEX retention_policy_history_policy_idx ON app_core.retention_policy_history(policy_uuid);
+CREATE INDEX retention_policy_history_created_idx ON app_core.retention_policy_history(created_at DESC);
+
+-- Trigger for retention_policy updated_at
+CREATE TRIGGER retention_policy_updated BEFORE UPDATE ON app_core.retention_policy
+  FOR EACH ROW EXECUTE FUNCTION app_core.update_timestamp();
+
 -- Comments for documentation
 COMMENT ON SCHEMA app_core IS 'Main application schema - all objects use two-word snake_case naming';
 COMMENT ON TABLE app_core.org_unit IS 'Organizations/tenants for multi-tenancy';
@@ -221,3 +301,5 @@ COMMENT ON TABLE app_core.stream_event IS 'Streaming events for timeline visuali
 COMMENT ON TABLE app_core.audit_log IS 'Security audit log for all actions';
 COMMENT ON TABLE app_core.model_price IS 'Model pricing for cost calculation';
 COMMENT ON TABLE app_core.user_session IS 'OIDC session storage';
+COMMENT ON TABLE app_core.retention_policy IS 'Database-stored retention policies for multi-tier data lifecycle management';
+COMMENT ON TABLE app_core.retention_policy_history IS 'Audit trail for retention policy changes';
