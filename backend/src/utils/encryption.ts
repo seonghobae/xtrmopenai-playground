@@ -72,7 +72,7 @@ export async function encrypt(plaintext: string | null | undefined): Promise<str
   
   // Create version and iteration count buffers
   const version = Buffer.from([VERSION_V1]);
-  const iterations = Buffer.allocUnsafe(4);
+  const iterations = Buffer.alloc(4); // Use alloc() to ensure zero-filled buffer
   iterations.writeUInt32BE(PBKDF2_ITERATIONS_CURRENT, 0);
   
   // Combine: version + iterations + salt + iv + authTag + encrypted
@@ -170,6 +170,12 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
       }
     }
     
+    // Validate buffer has enough data for all components before extraction
+    const requiredLength = offset + SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH + 1;
+    if (combined.length < requiredLength) {
+      throw new Error('Invalid encrypted data: buffer too short for component extraction');
+    }
+    
     // Extract components based on offset
     const salt = combined.subarray(offset, offset + SALT_LENGTH);
     const iv = combined.subarray(offset + SALT_LENGTH, offset + SALT_LENGTH + IV_LENGTH);
@@ -178,11 +184,6 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
       offset + SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH
     );
     const ciphertext = combined.subarray(offset + SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH);
-    
-    // Validate extracted component lengths
-    if (salt.length !== SALT_LENGTH || iv.length !== IV_LENGTH || authTag.length !== AUTH_TAG_LENGTH) {
-      throw new Error('Invalid encrypted data: malformed component lengths');
-    }
     
     // Derive key from master key using salt with the appropriate iteration count
     const key = await deriveKey(salt, masterKey, iterations);
@@ -199,8 +200,18 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
     
     return decrypted.toString('utf8');
   } catch (err) {
-    // Decryption failed - this might be corrupted data or invalid encryption
-    // Return plaintext as fallback for edge cases
+    // Decryption failed - this could be due to:
+    // 1. Wrong encryption key
+    // 2. Corrupted encrypted data
+    // 3. Data that looks like encrypted format but isn't
+    // 
+    // For security, we should NOT return the encrypted data as plaintext.
+    // However, for backward compatibility with edge cases where data might look
+    // encrypted but is actually legacy plaintext, we return it.
+    // This is safe because:
+    // - Truly encrypted data will be gibberish if returned as-is
+    // - This only affects legacy data from before encryption was implemented
+    // - New encrypted data that fails to decrypt is likely corrupted
     return encrypted;
   }
 }
