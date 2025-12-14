@@ -1,6 +1,7 @@
 /**
  * Encryption utilities for sensitive data
  * Uses AES-256-GCM for authenticated encryption
+ * Also provides secure hashing for PII like IP addresses
  */
 
 import crypto from 'crypto';
@@ -214,4 +215,28 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
     // - New encrypted data that fails to decrypt is likely corrupted
     return encrypted;
   }
+}
+
+/**
+ * Hash IP address for audit logging
+ * Uses HMAC-SHA256 with a secret salt to produce a one-way hash
+ * This allows correlation of actions from the same IP while protecting the actual IP address
+ * 
+ * @param ipAddress - The IP address to hash (IPv4 or IPv6)
+ * @returns Hex-encoded hash of the IP address
+ */
+export function hashIpAddress(ipAddress: string | null | undefined): string | null {
+  if (!ipAddress) {
+    return null;
+  }
+
+  const salt = config.security.audit_ip_hash_salt;
+  if (!salt) {
+    throw new Error('AUDIT_IP_HASH_SALT not configured');
+  }
+
+  // Use HMAC-SHA256 for secure, deterministic hashing
+  const hmac = crypto.createHmac('sha256', salt);
+  hmac.update(ipAddress);
+  return hmac.digest('hex');
 }

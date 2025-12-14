@@ -96,13 +96,15 @@ export interface StreamEvent {
  * Audit log entry for security-relevant actions
  * 
  * PII Handling Strategy:
- * - ip_addr, user_agent, and detail_json may contain PII
- * - NOT masked at runtime (impractical for multilingual LLM responses)
- * - Access controlled via RBAC (general users cannot view PII fields)
+ * - ip_addr: HMAC-SHA256 hashed at insertion time (see createAuditLog in audit/repository.ts)
+ *   Allows correlation while protecting actual IP addresses
+ * - user_agent: Stored as-is for forensic purposes (less sensitive, helps identify client types)
+ * - detail_json: Should NOT contain sensitive PII (see CreateAuditLogParams JSDoc for guidelines)
+ * - Access controlled via RBAC (general users cannot view audit logs)
  * - Progressive anonymization via multi-tier retention policies:
- *   1. Full retention (default 180 days)
- *   2. Partial anonymization (default 365 days) - IP hashed, user_agent kept
- *   3. Full anonymization (default 1095 days) - All PII removed
+ *   1. Full retention (default 180 days) - IP hash and user_agent kept
+ *   2. Partial anonymization (default 365 days) - user_agent kept, other fields may be redacted
+ *   3. Full anonymization (default 1095 days) - All identifiable information removed
  *   4. Deletion (default 1825 days) - Complete removal
  * 
  * See docs/SECURITY.md "PII and Retention Policy" section for details.
@@ -116,9 +118,9 @@ export interface AuditLog {
   target_type: string | null;
   target_id: string | null;
   result_code: string;
-  detail_json: Record<string, unknown>; // May contain PII - access controlled by RBAC
-  ip_addr: string | null;               // PII - subject to retention policy anonymization
-  user_agent: string | null;            // PII - subject to retention policy anonymization
+  detail_json: Record<string, unknown>; // Should not contain sensitive PII (see CreateAuditLogParams JSDoc)
+  ip_addr: string | null;               // HMAC-SHA256 hashed IP address for privacy + correlation
+  user_agent: string | null;            // User agent string (less sensitive, helps identify client types)
   created_at: Date;
 }
 
