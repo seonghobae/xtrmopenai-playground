@@ -233,7 +233,7 @@ app.post('/api/responses/run', {
 
 #### Multi-Tier Retention Strategy
 
-Audit logs follow a 3-stage lifecycle stored in `app_core.retention_policy`:
+Audit logs follow a 4-stage lifecycle stored in `app_core.retention_policy`:
 
 1. **Full Retention** (Default: 180 days / 6 months)
    - IP address hashes and user agents kept intact
