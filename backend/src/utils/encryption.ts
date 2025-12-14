@@ -113,14 +113,17 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
   if (!isEncrypted(encrypted)) {
     // Legacy plaintext data - return as-is for backward compatibility
     // Rate-limit warnings to prevent log flooding
-    const cacheKey = `legacy_${encrypted.substring(0, 20)}`;
+    // Use hash to avoid exposing sensitive data in cache keys
+    const hash = crypto.createHash('sha256').update(encrypted).digest('hex');
+    const cacheKey = `legacy_${hash}`;
     if (!legacyDataWarningCache.has(cacheKey)) {
       logger.warn('Decrypting legacy plaintext data - migration needed');
       legacyDataWarningCache.add(cacheKey);
       
-      // Prevent cache from growing indefinitely
+      // Prevent cache from growing indefinitely by removing oldest entry (simple FIFO)
       if (legacyDataWarningCache.size > LEGACY_WARNING_CACHE_MAX_SIZE) {
-        legacyDataWarningCache.clear();
+        const firstKey = legacyDataWarningCache.values().next().value;
+        legacyDataWarningCache.delete(firstKey);
       }
     }
     return encrypted;
