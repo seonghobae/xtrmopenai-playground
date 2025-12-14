@@ -125,8 +125,15 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 SESSION_SECRET=generate_secure_random_32_chars_minimum
 SESSION_TTL_SECONDS=86400
 SESSION_INACTIVITY_SECONDS=3600
-ENCRYPTION_KEY=generate_secure_random_32_chars_minimum
-AUDIT_IP_HASH_SALT=generate_stable_salt_for_ip_hashing_32_chars
+
+# Data encryption key (rotate every 90 days)
+# Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ENCRYPTION_KEY=generate_with_crypto_randomBytes_64_hex_chars
+
+# Audit IP hashing salt (128-bit minimum for PCI DSS v4.0)
+# Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# WARNING: Do NOT rotate without migration - breaks IP correlation analysis
+AUDIT_IP_HASH_SALT=generate_stable_64_hex_chars_via_csprng
 ```
 
 ## Database Schema
