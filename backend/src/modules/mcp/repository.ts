@@ -7,6 +7,15 @@ import { query } from '../../utils/database.js';
 import type { McpServer, McpTool, McpExecution } from '../../types/index.js';
 
 /**
+ * Validate allow_domain is a non-empty array
+ */
+function validateAllowDomain(allowDomain: string[]): void {
+  if (!Array.isArray(allowDomain) || allowDomain.length === 0) {
+    throw new Error('allow_domain must be a non-empty array');
+  }
+}
+
+/**
  * Create MCP server registration
  */
 export async function createMcpServer(params: {
@@ -14,11 +23,14 @@ export async function createMcpServer(params: {
   name_text: string;
   base_url: string;
   auth_header?: string;
-  allow_domain?: string[];
+  allow_domain: string[];
   timeout_ms?: number;
   retry_count?: number;
   meta_json?: Record<string, unknown>;
 }): Promise<McpServer> {
+  // Validate allow_domain is a non-empty array
+  validateAllowDomain(params.allow_domain);
+
   const result = await query<McpServer>(
     `INSERT INTO app_core.mcp_server
      (org_uuid, name_text, base_url, auth_header, allow_domain, timeout_ms, retry_count, meta_json)
@@ -29,7 +41,7 @@ export async function createMcpServer(params: {
       params.name_text,
       params.base_url,
       params.auth_header || null,
-      params.allow_domain || [],
+      params.allow_domain,
       params.timeout_ms || 30000,
       params.retry_count || 3,
       JSON.stringify(params.meta_json || {}),
@@ -76,6 +88,11 @@ export async function updateMcpServer(
   mcpUuid: string,
   updates: Partial<Omit<McpServer, 'mcp_uuid' | 'created_at' | 'updated_at'>>
 ): Promise<McpServer> {
+  // Validate allow_domain if provided
+  if (updates.allow_domain !== undefined) {
+    validateAllowDomain(updates.allow_domain);
+  }
+
   const fields: string[] = [];
   const values: unknown[] = [];
   let paramIndex = 1;
