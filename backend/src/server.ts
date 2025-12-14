@@ -226,7 +226,8 @@ async function registerRoutes() {
       reply.clearCookie('oidc_state', { path: '/' });
       reply.clearCookie('oidc_nonce', { path: '/' });
       reply.clearCookie('oidc_verifier', { path: '/' });
-      const requestedRedirect = request.unsignCookie(request.cookies[OIDC_RETURN_URL_COOKIE] || '').value || undefined;
+      const returnUrlCookie = request.unsignCookie(request.cookies[OIDC_RETURN_URL_COOKIE] || '');
+      const requestedRedirect = returnUrlCookie.valid ? returnUrlCookie.value : undefined;
       reply.clearCookie(OIDC_RETURN_URL_COOKIE, { path: '/' });
 
       // Audit log
