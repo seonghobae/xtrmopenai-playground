@@ -153,7 +153,7 @@ async function registerRoutes() {
         maxAge: 600,
       });
     } else {
-      reply.clearCookie(OIDC_RETURN_URL_COOKIE);
+      reply.clearCookie(OIDC_RETURN_URL_COOKIE, { path: '/', signed: true });
     }
 
     const authUrl = await buildAuthorizationUrl(state, nonce, codeChallenge);
@@ -219,12 +219,12 @@ async function registerRoutes() {
       });
 
       // Clear temporary cookies
-      reply.clearCookie('oidc_state');
-      reply.clearCookie('oidc_nonce');
-      reply.clearCookie('oidc_verifier');
+      reply.clearCookie('oidc_state', { path: '/', signed: true });
+      reply.clearCookie('oidc_nonce', { path: '/', signed: true });
+      reply.clearCookie('oidc_verifier', { path: '/', signed: true });
       const returnUrlResult = request.unsignCookie(request.cookies[OIDC_RETURN_URL_COOKIE] || '');
       const requestedRedirect = returnUrlResult.valid ? returnUrlResult.value : undefined;
-      reply.clearCookie(OIDC_RETURN_URL_COOKIE);
+      reply.clearCookie(OIDC_RETURN_URL_COOKIE, { path: '/', signed: true });
 
       // Audit log
       await createAuditLog({
@@ -256,7 +256,7 @@ async function registerRoutes() {
       await deleteSession(sessionKeyResult.value);
     }
 
-    reply.clearCookie('session_id');
+    reply.clearCookie('session_id', { path: '/', signed: true });
 
     await createAuditLog({
       user_uuid: request.user.user_uuid,
