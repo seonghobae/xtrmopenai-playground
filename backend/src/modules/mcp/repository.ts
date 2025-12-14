@@ -338,8 +338,8 @@ export async function getMcpExecutions(params: {
       [MCP_EXECUTION_TABLE, MCP_SCHEMA]
     );
     
-    if (!estimateResult.rows[0]) {
-      throw new Error('Unable to retrieve table statistics');
+    if (!estimateResult.rows.length) {
+      throw new Error(`Unable to retrieve table statistics for ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}`);
     }
     
     const estimate = parseInt(estimateResult.rows[0].estimate, 10);
@@ -351,7 +351,10 @@ export async function getMcpExecutions(params: {
         `SELECT COUNT(*) as count FROM ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}`,
         []
       );
-      total = parseInt(countResult.rows[0]?.count || '0', 10);
+      if (!countResult.rows.length) {
+        throw new Error(`Unable to retrieve count for ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}`);
+      }
+      total = parseInt(countResult.rows[0].count, 10);
     } else {
       total = estimate;
     }
@@ -361,7 +364,10 @@ export async function getMcpExecutions(params: {
       `SELECT COUNT(*) as count FROM ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE} ${whereClause}`,
       values
     );
-    total = parseInt(countResult.rows[0]?.count || '0', 10);
+    if (!countResult.rows.length) {
+      throw new Error(`Unable to retrieve count for ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}`);
+    }
+    total = parseInt(countResult.rows[0].count, 10);
   }
 
   const limit = params.limit || 50;
