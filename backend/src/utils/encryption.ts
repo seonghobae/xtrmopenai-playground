@@ -13,6 +13,8 @@ const SALT_LENGTH = 32;
 const VERSION_V1 = 0x01; // Version 1: includes iteration count
 const PBKDF2_ITERATIONS_LEGACY = 100000; // Legacy iteration count for v0 (pre-versioned) format
 const PBKDF2_ITERATIONS_CURRENT = 600000; // Current OWASP-recommended iteration count
+const PBKDF2_ITERATIONS_MIN = 100000; // Minimum allowed iterations for security
+const PBKDF2_ITERATIONS_MAX = 10000000; // Maximum allowed iterations to prevent DoS
 
 /**
  * Derive encryption key from the master key using PBKDF2
@@ -85,15 +87,27 @@ export async function encrypt(plaintext: string | null | undefined): Promise<str
 function isEncrypted(data: string): boolean {
   try {
     const decoded = Buffer.from(data, 'base64');
-    // Check for v1 format: version + iterations + salt + iv + authTag + ciphertext
-    const minLengthV1 = 1 + 4 + SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH + 1;
-    // Check for legacy v0 format: salt + iv + authTag + ciphertext
-    const minLengthV0 = SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH + 1;
     
-    const hasValidLength = decoded.length >= minLengthV0;
+    // Check for valid base64 encoding
     const isValidBase64 = Buffer.from(decoded.toString('base64'), 'base64').equals(decoded);
+    if (!isValidBase64) {
+      return false;
+    }
     
-    return hasValidLength && isValidBase64;
+    // Check minimum length and validate format-specific requirements
+    if (decoded.length === 0) {
+      return false;
+    }
+    
+    // Check if v1 format
+    const minLengthV1 = 1 + 4 + SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH + 1;
+    if (decoded[0] === VERSION_V1) {
+      return decoded.length >= minLengthV1;
+    }
+    
+    // Check for legacy v0 format
+    const minLengthV0 = SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH + 1;
+    return decoded.length >= minLengthV0;
   } catch {
     return false;
   }
@@ -122,6 +136,11 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
     // Decode from base64
     const combined = Buffer.from(encrypted, 'base64');
     
+    // Validate minimum buffer length
+    if (combined.length === 0) {
+      throw new Error('Invalid encrypted data: empty buffer');
+    }
+    
     // Check if this is v1 format (has version byte)
     let offset = 0;
     let iterations = PBKDF2_ITERATIONS_LEGACY; // Default to legacy count for v0 format
@@ -129,10 +148,20 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
     // Detect format version
     const firstByte = combined[0];
     if (firstByte === VERSION_V1) {
-      // V1 format: read version and iteration count
+      // V1 format: validate length and read iteration count
+      const minLengthV1 = 1 + 4 + SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH + 1;
+      if (combined.length < minLengthV1) {
+        throw new Error('Invalid v1 encrypted data: buffer too short');
+      }
+      
       offset = 1; // Skip version byte
       iterations = combined.readUInt32BE(offset);
       offset += 4;
+      
+      // Validate iteration count to prevent DoS attacks
+      if (iterations < PBKDF2_ITERATIONS_MIN || iterations > PBKDF2_ITERATIONS_MAX) {
+        throw new Error(`Invalid iteration count: ${iterations} (must be between ${PBKDF2_ITERATIONS_MIN} and ${PBKDF2_ITERATIONS_MAX})`);
+      }
     }
     // else: V0 format (legacy) - offset stays at 0, iterations already set to legacy value
     
