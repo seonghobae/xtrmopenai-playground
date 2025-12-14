@@ -4,6 +4,7 @@
  */
 
 import { query } from '../../utils/database.js';
+import { encrypt, decrypt } from '../../utils/encryption.js';
 import type { McpServer, McpTool, McpExecution } from '../../types/index.js';
 
 /**
@@ -40,11 +41,11 @@ export async function createMcpServer(params: {
       params.org_uuid,
       params.name_text,
       params.base_url,
-      params.auth_header || null,
+      await encrypt(params.auth_header),
       params.allow_domain,
       params.timeout_ms || 30000,
       params.retry_count || 3,
-      JSON.stringify(params.meta_json || {}),
+      params.meta_json || {},
     ]
   );
 
@@ -52,7 +53,11 @@ export async function createMcpServer(params: {
     throw new Error('Failed to create MCP server');
   }
 
-  return result.rows[0];
+  const server = result.rows[0];
+  return {
+    ...server,
+    auth_header: await decrypt(server.auth_header),
+  };
 }
 
 /**
@@ -64,7 +69,15 @@ export async function getMcpServer(mcpUuid: string): Promise<McpServer | null> {
     [mcpUuid]
   );
 
-  return result.rows[0] || null;
+  const server = result.rows[0];
+  if (!server) {
+    return null;
+  }
+
+  return {
+    ...server,
+    auth_header: await decrypt(server.auth_header),
+  };
 }
 
 /**
@@ -78,7 +91,12 @@ export async function listMcpServers(orgUuid: string | null): Promise<McpServer[
     [orgUuid]
   );
 
-  return result.rows;
+  return Promise.all(
+    result.rows.map(async (server) => ({
+      ...server,
+      auth_header: await decrypt(server.auth_header),
+    }))
+  );
 }
 
 /**
@@ -109,7 +127,7 @@ export async function updateMcpServer(
 
   if (updates.auth_header !== undefined) {
     fields.push(`auth_header = $${paramIndex++}`);
-    values.push(updates.auth_header);
+    values.push(await encrypt(updates.auth_header));
   }
 
   if (updates.allow_domain !== undefined) {
@@ -129,7 +147,7 @@ export async function updateMcpServer(
 
   if (updates.meta_json !== undefined) {
     fields.push(`meta_json = $${paramIndex++}`);
-    values.push(JSON.stringify(updates.meta_json));
+    values.push(updates.meta_json);
   }
 
   if (fields.length === 0) {
@@ -150,7 +168,11 @@ export async function updateMcpServer(
     throw new Error('MCP server not found');
   }
 
-  return result.rows[0];
+  const server = result.rows[0];
+  return {
+    ...server,
+    auth_header: await decrypt(server.auth_header),
+  };
 }
 
 /**
@@ -177,7 +199,7 @@ export async function upsertMcpTool(
          schema_hash = EXCLUDED.schema_hash,
          updated_at = now()
      RETURNING *`,
-    [mcpUuid, toolName, JSON.stringify(schemaJson), schemaHash]
+    [mcpUuid, toolName, schemaJson, schemaHash]
   );
 
   if (result.rows.length === 0) {
@@ -233,8 +255,8 @@ export async function createMcpExecution(params: {
       params.tool_uuid || null,
       params.org_uuid || null,
       params.user_uuid || null,
-      JSON.stringify(params.params_json),
-      params.result_json ? JSON.stringify(params.result_json) : null,
+      params.params_json,
+      params.result_json || null,
       params.status_text,
       params.duration_ms || null,
       params.error_text || null,

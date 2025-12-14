@@ -30,7 +30,7 @@ export async function upsertUserAccount(
          meta_json = EXCLUDED.meta_json,
          updated_at = now()
      RETURNING *`,
-    [subText, emailText, nameText, JSON.stringify(metaJson)]
+    [subText, emailText, nameText, metaJson]
   );
 
   if (result.rows.length === 0) {
@@ -125,7 +125,7 @@ export async function createSession(
     `INSERT INTO app_core.user_session (user_uuid, session_key, token_json, expires_at)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [userUuid, sessionKey, JSON.stringify(tokenJson), expiresAt]
+    [userUuid, sessionKey, tokenJson, expiresAt]
   );
 
   if (result.rows.length === 0) {
