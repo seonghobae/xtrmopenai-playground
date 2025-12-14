@@ -319,12 +319,24 @@ export async function getMcpExecutions(params: {
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const countResult = await query<{ count: string }>(
-    `SELECT COUNT(*) as count FROM app_core.mcp_execution ${whereClause}`,
-    values
-  );
-
-  const total = parseInt(countResult.rows[0]?.count || '0', 10);
+  // Performance optimization: Use estimated count for unfiltered queries
+  let total: number;
+  if (conditions.length === 0) {
+    // Use pg_class.reltuples for fast estimated count when no filters
+    const estimateResult = await query<{ estimate: string }>(
+      `SELECT reltuples::bigint as estimate 
+       FROM pg_class 
+       WHERE relname = 'mcp_execution' AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'app_core')`
+    );
+    total = parseInt(estimateResult.rows[0]?.estimate || '0', 10);
+  } else {
+    // Use exact COUNT(*) when filters are applied
+    const countResult = await query<{ count: string }>(
+      `SELECT COUNT(*) as count FROM app_core.mcp_execution ${whereClause}`,
+      values
+    );
+    total = parseInt(countResult.rows[0]?.count || '0', 10);
+  }
 
   const limit = params.limit || 50;
   const offset = params.offset || 0;
