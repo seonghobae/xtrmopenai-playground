@@ -169,7 +169,10 @@ async function registerRoutes() {
 
     // Verify state
     const storedStateResult = request.unsignCookie(request.cookies.oidc_state || '');
-    const storedState = storedStateResult.valid ? storedStateResult.value : null;
+    if (!storedStateResult.valid) {
+      return reply.status(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'Invalid state cookie signature' } });
+    }
+    const storedState = storedStateResult.value;
     if (state !== storedState) {
       return reply.status(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'State mismatch' } });
     }
