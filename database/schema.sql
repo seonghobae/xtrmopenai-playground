@@ -105,7 +105,7 @@ CREATE TABLE app_core.response_run (
 CREATE TABLE app_core.stream_event (
   event_uuid    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_uuid      UUID NOT NULL REFERENCES app_core.response_run(run_uuid) ON DELETE CASCADE,
-  event_type    TEXT NOT NULL, -- 'delta', 'tool_call_start', 'tool_call_complete', etc.
+  event_type    TEXT NOT NULL CHECK (event_type IN ('output_text.delta', 'tool_call.start', 'tool_call.complete')),
   event_json    JSONB NOT NULL,
   sequence_num  INT NOT NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
