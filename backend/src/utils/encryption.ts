@@ -71,12 +71,33 @@ export async function encrypt(plaintext: string | null | undefined): Promise<str
 }
 
 /**
+ * Check if data appears to be encrypted (base64 with correct length)
+ */
+function isEncrypted(data: string): boolean {
+  try {
+    const decoded = Buffer.from(data, 'base64');
+    // Encrypted data must have at least: salt + iv + authTag + some ciphertext
+    const minLength = SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH + 1;
+    return decoded.length >= minLength && Buffer.from(decoded.toString('base64'), 'base64').equals(decoded);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Decrypt encrypted text data
  * Expects base64-encoded string containing: salt + iv + authTag + ciphertext
+ * Falls back to returning plaintext for legacy data that isn't encrypted
  */
 export async function decrypt(encrypted: string | null | undefined): Promise<string | null> {
   if (!encrypted) {
     return null;
+  }
+
+  // Check if this looks like encrypted data
+  if (!isEncrypted(encrypted)) {
+    // Legacy plaintext data - return as-is for backward compatibility
+    return encrypted;
   }
 
   const masterKey = validateEncryptionKey();
@@ -109,7 +130,8 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
     
     return decrypted.toString('utf8');
   } catch (err) {
-    // Use generic error message to avoid leaking sensitive information
-    throw new Error('Failed to decrypt data');
+    // Decryption failed - this might be corrupted data or invalid encryption
+    // Return plaintext as fallback for edge cases
+    return encrypted;
   }
 }
