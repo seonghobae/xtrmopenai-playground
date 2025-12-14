@@ -331,7 +331,7 @@ export async function getMcpExecutions(params: {
     // It returns -1 for tables that have never been analyzed. For large tables
     // without filters, this provides much better performance than COUNT(*).
     const estimateResult = await query<{ estimate: string }>(
-      `SELECT c.reltuples::bigint as estimate 
+      `SELECT c.reltuples::bigint as estimate
        FROM pg_class c
        JOIN pg_namespace n ON n.oid = c.relnamespace
        WHERE c.relname = $1 AND n.nspname = $2`,
@@ -344,7 +344,8 @@ export async function getMcpExecutions(params: {
     
     const estimate = parseInt(estimateResult.rows[0].estimate, 10);
     
-    // If reltuples is -1 (table never analyzed) or negative, fall back to exact COUNT(*)
+    // If reltuples is negative (table never analyzed), fall back to exact COUNT(*)
+    // Note: 0 is a valid estimate for empty tables
     if (estimate < 0) {
       const countResult = await query<{ count: string }>(
         `SELECT COUNT(*) as count FROM ${MCP_SCHEMA}.${MCP_EXECUTION_TABLE}`,
