@@ -394,6 +394,15 @@ async function shutdown() {
     if (sessionCleanupInterval) {
       clearInterval(sessionCleanupInterval);
       sessionCleanupInterval = null;
+      
+      // Wait for any running cleanup to complete
+      if (isCleanupRunning) {
+        logger.info('Waiting for session cleanup to complete...');
+        while (isCleanupRunning) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      
       logger.info('Session cleanup scheduler stopped');
     }
 
