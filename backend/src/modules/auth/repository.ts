@@ -139,10 +139,15 @@ export async function createSession(
 
   // Decrypt tokens in the returned session
   const session = result.rows[0];
-  return {
-    ...session,
-    token_json: decryptJson(session.token_json as unknown as string) as any,
-  };
+  try {
+    return {
+      ...session,
+      token_json: decryptJson(session.token_json as unknown as string),
+    };
+  } catch (err) {
+    logger.error({ err, session_uuid: session.session_uuid }, 'Failed to decrypt session tokens');
+    throw new Error('Failed to decrypt session tokens');
+  }
 }
 
 /**
@@ -168,10 +173,15 @@ export async function getSessionByKey(sessionKey: string): Promise<UserSession |
   }
 
   // Decrypt tokens before returning
-  return {
-    ...session,
-    token_json: decryptJson(session.token_json as unknown as string) as any,
-  };
+  try {
+    return {
+      ...session,
+      token_json: decryptJson(session.token_json as unknown as string),
+    };
+  } catch (err) {
+    logger.error({ err, session_uuid: session.session_uuid }, 'Failed to decrypt session tokens');
+    throw new Error('Failed to decrypt session tokens');
+  }
 }
 
 /**

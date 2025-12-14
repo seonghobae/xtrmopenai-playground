@@ -60,6 +60,14 @@ export function decrypt(encryptedData: string): string {
   // Decode from base64
   const combined = Buffer.from(encryptedData, 'base64');
   
+  // Validate minimum length
+  const minLength = SALT_LENGTH + IV_LENGTH + AUTH_TAG_LENGTH;
+  if (combined.length < minLength) {
+    throw new Error(
+      `Invalid encrypted data: expected at least ${minLength} bytes, got ${combined.length}`
+    );
+  }
+  
   // Extract components
   const salt = combined.subarray(0, SALT_LENGTH);
   const iv = combined.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
@@ -96,5 +104,12 @@ export function encryptJson(obj: Record<string, unknown>): string {
  */
 export function decryptJson(encryptedData: string): Record<string, unknown> {
   const decrypted = decrypt(encryptedData);
-  return JSON.parse(decrypted) as Record<string, unknown>;
+  
+  try {
+    return JSON.parse(decrypted) as Record<string, unknown>;
+  } catch (err) {
+    throw new Error(
+      `Failed to parse decrypted data as JSON: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 }
