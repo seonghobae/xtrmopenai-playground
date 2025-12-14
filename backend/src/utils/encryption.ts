@@ -5,6 +5,7 @@
 
 import crypto from 'crypto';
 import { config } from '../config/index.js';
+import { logger } from './logger.js';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16; // GCM recommended IV length
@@ -87,7 +88,17 @@ function isEncrypted(data: string): boolean {
 /**
  * Decrypt encrypted text data
  * Expects base64-encoded string containing: salt + iv + authTag + ciphertext
- * Falls back to returning plaintext for legacy data that isn't encrypted
+ * 
+ * **Backward Compatibility Fallback:**
+ * - Returns plaintext as-is for legacy unencrypted data (detected via isEncrypted check)
+ * - Returns original input on decryption failure as a safety measure for corrupted data
+ * - Emits warning logs when fallback behavior is triggered to facilitate migration tracking
+ * 
+ * **Migration Plan:**
+ * - All new data is encrypted using the encrypt() function
+ * - Legacy plaintext data is gradually encrypted when updated through normal operations
+ * - Monitor warning logs to track migration progress
+ * - Plan to remove fallback behavior after sufficient migration period (e.g., 6-12 months)
  */
 export async function decrypt(encrypted: string | null | undefined): Promise<string | null> {
   if (!encrypted) {
@@ -97,6 +108,7 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
   // Check if this looks like encrypted data
   if (!isEncrypted(encrypted)) {
     // Legacy plaintext data - return as-is for backward compatibility
+    logger.warn({ dataLength: encrypted.length }, 'Decrypting legacy plaintext data - migration needed');
     return encrypted;
   }
 
@@ -132,6 +144,10 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
   } catch (err) {
     // Decryption failed - this might be corrupted data or invalid encryption
     // Return plaintext as fallback for edge cases
+    logger.warn(
+      { error: err instanceof Error ? err.message : 'Unknown error', dataLength: encrypted.length },
+      'Decryption failed - returning original data (possible corruption or legacy format)'
+    );
     return encrypted;
   }
 }
