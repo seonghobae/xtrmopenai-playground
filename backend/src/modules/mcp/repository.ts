@@ -157,7 +157,14 @@ export async function updateMcpServer(
  * Delete MCP server
  */
 export async function deleteMcpServer(mcpUuid: string): Promise<void> {
-  await query(`DELETE FROM app_core.mcp_server WHERE mcp_uuid = $1`, [mcpUuid]);
+  const result = await query(
+    `DELETE FROM app_core.mcp_server WHERE mcp_uuid = $1`,
+    [mcpUuid]
+  );
+
+  if (result.rowCount === 0) {
+    throw new Error('MCP server not found');
+  }
 }
 
 /**
