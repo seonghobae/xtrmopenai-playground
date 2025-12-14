@@ -19,6 +19,11 @@ export async function createMcpServer(params: {
   retry_count?: number;
   meta_json?: Record<string, unknown>;
 }): Promise<McpServer> {
+  // Validate allow_domain is a non-empty array
+  if (!Array.isArray(params.allow_domain) || params.allow_domain.length === 0) {
+    throw new Error('allow_domain must be a non-empty array');
+  }
+
   const result = await query<McpServer>(
     `INSERT INTO app_core.mcp_server
      (org_uuid, name_text, base_url, auth_header, allow_domain, timeout_ms, retry_count, meta_json)
@@ -76,6 +81,13 @@ export async function updateMcpServer(
   mcpUuid: string,
   updates: Partial<Omit<McpServer, 'mcp_uuid' | 'created_at' | 'updated_at'>>
 ): Promise<McpServer> {
+  // Validate allow_domain if provided
+  if (updates.allow_domain !== undefined) {
+    if (!Array.isArray(updates.allow_domain) || updates.allow_domain.length === 0) {
+      throw new Error('allow_domain must be a non-empty array');
+    }
+  }
+
   const fields: string[] = [];
   const values: unknown[] = [];
   let paramIndex = 1;
