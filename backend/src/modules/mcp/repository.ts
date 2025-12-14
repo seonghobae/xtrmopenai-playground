@@ -7,6 +7,15 @@ import { query } from '../../utils/database.js';
 import type { McpServer, McpTool, McpExecution } from '../../types/index.js';
 
 /**
+ * Validate allow_domain is a non-empty array
+ */
+function validateAllowDomain(allowDomain: string[]): void {
+  if (!Array.isArray(allowDomain) || allowDomain.length === 0) {
+    throw new Error('allow_domain must be a non-empty array');
+  }
+}
+
+/**
  * Create MCP server registration
  */
 export async function createMcpServer(params: {
@@ -20,9 +29,7 @@ export async function createMcpServer(params: {
   meta_json?: Record<string, unknown>;
 }): Promise<McpServer> {
   // Validate allow_domain is a non-empty array
-  if (!Array.isArray(params.allow_domain) || params.allow_domain.length === 0) {
-    throw new Error('allow_domain must be a non-empty array');
-  }
+  validateAllowDomain(params.allow_domain);
 
   const result = await query<McpServer>(
     `INSERT INTO app_core.mcp_server
@@ -83,9 +90,7 @@ export async function updateMcpServer(
 ): Promise<McpServer> {
   // Validate allow_domain if provided
   if (updates.allow_domain !== undefined) {
-    if (!Array.isArray(updates.allow_domain) || updates.allow_domain.length === 0) {
-      throw new Error('allow_domain must be a non-empty array');
-    }
+    validateAllowDomain(updates.allow_domain);
   }
 
   const fields: string[] = [];
