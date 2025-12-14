@@ -263,10 +263,11 @@ export async function createMcpExecution(params: {
  *   3. Implement summary tables with triggers for real-time total counts
  *   4. Cache counts with periodic refresh for non-critical displays
  * 
- * - Query pattern analysis: Based on typical usage, ~95% of calls include at least one
- *   filter (org_uuid for tenant isolation, user_uuid for user history, tool_uuid for
- *   tool analytics, or date ranges for recent activity), making the composite indexes
- *   highly effective for real-world queries.
+ * - Query pattern analysis: In typical multi-tenant applications, an estimated ~95% of
+ *   calls include at least one filter (org_uuid for tenant isolation, user_uuid for user
+ *   history, tool_uuid for tool analytics, or date ranges for recent activity), making
+ *   the composite indexes highly effective for real-world queries. Monitor actual patterns
+ *   in production and adjust indexing strategy accordingly.
  */
 export async function getMcpExecutions(params: {
   tool_uuid?: string;

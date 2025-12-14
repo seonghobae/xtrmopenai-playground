@@ -58,7 +58,16 @@ These indexes existed before and continue to serve their purpose:
 2. **mcp_execution_user_idx**: Single-column index on `user_uuid`
 3. **mcp_execution_created_idx**: Single-column index on `created_at DESC`
 
-Note: There's a potential for further optimization here - `mcp_execution_org_idx` and `mcp_execution_user_idx` could also be considered redundant given the composite indexes. However, this PR focuses only on the four indexes mentioned in the review (lines 173-176).
+**Note on additional optimization opportunity:** The single-column indexes `mcp_execution_org_idx`
+and `mcp_execution_user_idx` could potentially be considered redundant given the composite indexes
+`idx_mcp_execution_org_created` and `idx_mcp_execution_user_created`. However:
+- These pre-existing indexes were not part of the reviewer's feedback (which focused on lines 173-176)
+- They may serve queries that don't include ORDER BY created_at (though this is uncommon in this codebase)
+- Removing them would require additional analysis to ensure no query regressions
+
+**Recommendation:** Monitor index usage in production using `pg_stat_user_indexes`. If
+`mcp_execution_org_idx` and `mcp_execution_user_idx` show zero or very low `idx_scan` counts
+while their composite counterparts are heavily used, consider removing them in a future optimization PR.
 
 ## Addressing Reviewer Concerns
 

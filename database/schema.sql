@@ -171,8 +171,10 @@ CREATE INDEX user_session_expires_idx ON app_core.user_session(expires_at);
 -- mcp_execution indexes: Composite indexes support both filtered and single-column queries
 -- Note: Composite indexes (tool_uuid+created_at, status_text+created_at) serve dual purpose:
 -- 1. Efficiently handle filtered queries with ORDER BY created_at DESC
--- 2. Can be used for queries filtering only on the first column (tool_uuid or status_text)
--- Single-column indexes are redundant and have been removed to reduce write overhead.
+-- 2. Can be used for queries filtering only on the first column of the composite index
+--    (e.g., WHERE tool_uuid = X will use idx_mcp_execution_tool_created)
+-- Single-column indexes on tool_uuid and status_text were redundant and have been removed
+-- to reduce write overhead.
 CREATE INDEX idx_mcp_execution_org_created ON app_core.mcp_execution(org_uuid, created_at) WHERE org_uuid IS NOT NULL;
 CREATE INDEX idx_mcp_execution_user_created ON app_core.mcp_execution(user_uuid, created_at) WHERE user_uuid IS NOT NULL;
 CREATE INDEX idx_mcp_execution_tool_created ON app_core.mcp_execution(tool_uuid, created_at) WHERE tool_uuid IS NOT NULL;

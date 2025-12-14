@@ -33,17 +33,22 @@ Each index adds approximately 5-10% overhead to INSERT operations. By removing t
 
 #### 3. Query Pattern Analysis
 
-Based on typical usage patterns for the `getMcpExecutions()` function:
+Based on estimated typical usage patterns for the `getMcpExecutions()` function:
 
-| Query Pattern | Frequency | Index Used |
-|--------------|-----------|------------|
+| Query Pattern | Estimated Frequency | Index Used |
+|--------------|---------------------|------------|
 | Filter by org_uuid + date range | ~60% | idx_mcp_execution_org_created |
 | Filter by user_uuid + date range | ~20% | idx_mcp_execution_user_created |
 | Filter by tool_uuid + date range | ~10% | idx_mcp_execution_tool_created |
 | Filter by status_text + date range | ~5% | idx_mcp_execution_status_created |
 | No filters (total count) | ~5% | Sequential scan (unavoidable) |
 
-**Key Insight:** ~95% of queries include filters, making the composite indexes highly effective.
+**Note:** These frequencies are estimates based on common multi-tenant application patterns
+(org-scoped queries for tenant isolation, user-scoped for history, tool-scoped for analytics).
+Production environments should monitor actual query patterns and adjust indexes accordingly.
+
+**Key Insight:** In typical usage, ~95% of queries are expected to include filters, making
+the composite indexes highly effective.
 
 ### COUNT(*) Strategy for Filter-less Queries
 
