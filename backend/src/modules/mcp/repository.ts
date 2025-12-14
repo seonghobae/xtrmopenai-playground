@@ -256,10 +256,10 @@ export async function createMcpExecution(params: {
  * alert if >1s; track slow query count and planning time in logs.
  * 
  * Mitigation strategies:
- * - Use approximate counts: SELECT reltuples FROM pg_class WHERE relname='mcp_execution'
+ * - Use approximate counts: SELECT reltuples FROM pg_class WHERE relname = $1
  * - Require filtered queries or enforce LIMIT for unfiltered requests
  * - Maintain summary tables or materialized views for analytics
- * - Use indexed partial counts: SELECT COUNT(*) ... WHERE indexed_column = $1 LIMIT 10000
+ * - Use indexed partial counts: SELECT COUNT(*) FROM table WHERE indexed_column = $1 AND created_at > $2
  * 
  * Composite indexes (tool_uuid+created_at, status_text+created_at, org_uuid+created_at,
  * user_uuid+created_at) are in place to optimize filtered queries.
