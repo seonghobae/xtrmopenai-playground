@@ -43,8 +43,8 @@ Based on estimated typical usage patterns for the `getMcpExecutions()` function:
 | Filter by status_text + date range | ~5% | idx_mcp_execution_status_created |
 | No filters (total count) | ~5% | Sequential scan (unavoidable) |
 
-**Note:** These frequencies are estimates based on common multi-tenant application patterns
-(org-scoped queries for tenant isolation, user-scoped for history, tool-scoped for analytics).
+**Note:** The frequencies above are hypothetical assumptions based on typical SaaS/multi-tenant application patterns
+(e.g., org-scoped queries for tenant isolation, user-scoped for history, tool-scoped for analytics), and are not measured from this codebase.
 Production environments should monitor actual query patterns and adjust indexes accordingly.
 
 **Key Insight:** In typical usage, ~95% of queries are expected to include filters, making
