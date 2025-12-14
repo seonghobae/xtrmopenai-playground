@@ -14,6 +14,7 @@ import { logger } from './utils/logger.js';
 import { healthCheck, closePool } from './utils/database.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { discoverOidcConfig } from './modules/auth/oidc.js';
+import { deleteExpiredSessions } from './modules/auth/repository.js';
 
 const OIDC_RETURN_URL_COOKIE = 'oidc_return_to';
 
@@ -43,6 +44,10 @@ const server = Fastify({
   disableRequestLogging: false,
   trustProxy: true,
 });
+
+// Session cleanup scheduler
+let sessionCleanupInterval: NodeJS.Timeout | null = null;
+let isCleanupRunning = false;
 
 /**
  * Register plugins
@@ -341,6 +346,30 @@ async function start() {
       port: config.server.port,
     });
 
+    // Start session cleanup scheduler
+    const cleanupIntervalMs = config.security.session_cleanup_interval_seconds * 1000;
+    
+    sessionCleanupInterval = setInterval(async () => {
+      if (isCleanupRunning) {
+        logger.warn('Session cleanup already running, skipping this interval');
+        return;
+      }
+      
+      isCleanupRunning = true;
+      try {
+        await deleteExpiredSessions();
+      } catch (err) {
+        logger.error({ err }, 'Session cleanup failed');
+      } finally {
+        isCleanupRunning = false;
+      }
+    }, cleanupIntervalMs);
+    
+    logger.info(
+      { intervalSeconds: config.security.session_cleanup_interval_seconds },
+      'Session cleanup scheduler started'
+    );
+
     logger.info(
       {
         host: config.server.host,
@@ -361,6 +390,22 @@ async function shutdown() {
   logger.info('Shutting down server...');
 
   try {
+    // Stop session cleanup scheduler
+    if (sessionCleanupInterval) {
+      clearInterval(sessionCleanupInterval);
+      sessionCleanupInterval = null;
+      
+      // Wait for any running cleanup to complete
+      if (isCleanupRunning) {
+        logger.info('Waiting for session cleanup to complete...');
+        while (isCleanupRunning) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      
+      logger.info('Session cleanup scheduler stopped');
+    }
+
     await server.close();
     await closePool();
     logger.info('Server shut down gracefully');
