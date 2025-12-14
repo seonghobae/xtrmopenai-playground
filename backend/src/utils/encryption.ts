@@ -115,10 +115,14 @@ function isEncrypted(data: string): boolean {
 }
 
 /**
- * Decrypt encrypted text data
- * Supports both v1 format (version + iterations + salt + iv + authTag + ciphertext)
- * and legacy v0 format (salt + iv + authTag + ciphertext with 100k iterations)
- * Falls back to returning plaintext for legacy unencrypted data
+ * Decrypts text produced by this module's AES-256-GCM format, supporting both v1 (version + iterations + salt + iv + authTag + ciphertext) and legacy v0 encodings.
+ *
+ * @param encrypted - Base64-encoded encrypted payload or legacy plaintext.
+ * @returns Decrypted UTF-8 string. Returns `null` if `encrypted` is `null` or `undefined`; returns the original input string unmodified if the input is not recognized as encrypted or if decryption fails.
+ *
+ * @warning If decryption fails or the input is not recognized as encrypted, this function returns the original input string unmodified.
+ *          Callers MUST validate whether the returned value is the same as the input to distinguish between successful decryption and fallback.
+ *          Failing to do so may mask decryption failures and introduce security vulnerabilities.
  */
 export async function decrypt(encrypted: string | null | undefined): Promise<string | null> {
   if (!encrypted) {
@@ -218,12 +222,13 @@ export async function decrypt(encrypted: string | null | undefined): Promise<str
 }
 
 /**
- * Hash IP address for audit logging
- * Uses HMAC-SHA256 with a secret salt to produce a one-way hash
- * This allows correlation of actions from the same IP while protecting the actual IP address
- * 
- * @param ipAddress - The IP address to hash (IPv4 or IPv6)
- * @returns Hex-encoded hash of the IP address
+ * Produce a deterministic, one-way hash of an IP address for audit correlation.
+ *
+ * Uses HMAC-SHA256 with a configured salt to generate a hex-encoded digest.
+ *
+ * @param ipAddress - The IP address to hash (IPv4 or IPv6). If falsy, the function returns `null`.
+ * @returns `null` if `ipAddress` is falsy; otherwise the hex-encoded HMAC-SHA256 of the provided IP address.
+ * @throws If the audit IP hash salt (`config.security.audit_ip_hash_salt`) is not configured.
  */
 export function hashIpAddress(ipAddress: string | null | undefined): string | null {
   if (!ipAddress) {

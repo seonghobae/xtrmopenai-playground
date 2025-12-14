@@ -53,10 +53,10 @@ export interface CreateAuditLogParams {
 }
 
 /**
- * Create audit log entry
- * 
- * Automatically hashes IP addresses before storage for privacy protection
- * while maintaining the ability to correlate actions from the same source.
+ * Create a new audit log record with privacy-preserving handling of the provided IP address.
+ *
+ * @param params - Parameters for the audit entry. The `ip_addr` value will be hashed before storage; `detail_json` must avoid sensitive PII and should be redacted when necessary.
+ * @returns The inserted `AuditLog` row on success, `null` if the entry could not be created.
  */
 export async function createAuditLog(params: CreateAuditLogParams): Promise<AuditLog | null> {
   try {
