@@ -105,7 +105,6 @@ export interface StreamEvent {
  *   1. Full retention (default 180 days) - IP hash and user_agent kept
  *   2. Partial anonymization (default 365 days) - user_agent kept, other fields may be redacted
  *   3. Full anonymization (default 1095 days) - All identifiable information removed
- *   4. Deletion (default 1825 days) - Complete removal
  * 
  * See docs/SECURITY.md "PII and Retention Policy" section for details.
  * See backend/src/modules/audit/repository.ts applyAuditRetentionPolicy()
