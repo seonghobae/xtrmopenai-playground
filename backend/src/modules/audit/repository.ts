@@ -213,7 +213,12 @@ export async function applyAuditRetentionPolicy(
   stats.fullAnonymized = fullAnonResult.rowCount || 0;
 
   // Step 3: Partial anonymization (hash IP, keep user_agent for security analysis)
-  // Use HMAC with dedicated stable salt (32 chars = 128 bits for adequate security)
+  // Use HMAC-SHA256 with dedicated stable salt from config
+  // Truncate to 32 hex chars (128 bits) - adequate for IP anonymization use case:
+  // - IPv4 address space: 2^32 (~4B addresses) requires ~32 bits to enumerate
+  // - 128-bit hash provides 2^96 security margin against collisions
+  // - Enables pattern analysis while preventing reverse lookup
+  // Note: Requires pgcrypto extension (enabled in schema.sql)
   const partialAnonResult = await query(
     `UPDATE app_core.audit_log
      SET ip_addr = CASE

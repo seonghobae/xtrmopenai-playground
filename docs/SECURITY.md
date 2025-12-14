@@ -206,7 +206,7 @@ Audit logs follow a conservative 4-stage lifecycle stored in `app_core.retention
    - Meets most regulatory requirements for active investigation periods
 
 2. **Partial Anonymization** (Default: 365 days / 1 year)
-   - IP addresses hashed (SHA-256 with salt) for pattern analysis
+   - IP addresses hashed with HMAC-SHA256 (128-bit output) using dedicated stable salt
    - User agents retained for security analysis
    - Meets PCI DSS requirement 10.7 (minimum 1 year)
    - Marked with `_partial_anonymized` timestamp in `detail_json`
@@ -319,7 +319,13 @@ await upsertRetentionPolicy({
 - Session secrets: Rotate every 90 days
 - API keys: Rotate per vendor recommendation
 - Database passwords: Rotate every 180 days
-- Audit IP hash salt: **Do not rotate** (breaks IP correlation analysis across retention periods)
+- Audit IP hash salt: **Generally do not rotate** (breaks IP correlation analysis)
+  - If rotation is necessary (e.g., salt compromise):
+    1. Create new salt in environment
+    2. Add `detail_json` field marking which salt version was used
+    3. Update hashing logic to check salt version
+    4. Re-hash affected logs during off-peak hours
+    5. Document migration in retention policy change log
 
 ## Database Security
 
