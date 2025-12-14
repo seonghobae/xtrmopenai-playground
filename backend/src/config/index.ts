@@ -38,7 +38,7 @@ const configSchema = z.object({
   SESSION_SECRET: z.string().min(32),
   SESSION_TTL_SECONDS: z.coerce.number().default(86400), // 24 hours
   SESSION_INACTIVITY_SECONDS: z.coerce.number().default(3600), // 1 hour
-  SESSION_CLEANUP_INTERVAL_SECONDS: z.coerce.number().default(3600), // 1 hour
+  SESSION_CLEANUP_INTERVAL_SECONDS: z.coerce.number().min(60).default(3600), // 1 hour, minimum 60 seconds
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000), // 1 minute
 

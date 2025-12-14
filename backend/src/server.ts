@@ -47,6 +47,7 @@ const server = Fastify({
 
 // Session cleanup scheduler
 let sessionCleanupInterval: NodeJS.Timeout | null = null;
+let isCleanupRunning = false;
 
 /**
  * Register plugins
@@ -349,10 +350,18 @@ async function start() {
     const cleanupIntervalMs = config.security.session_cleanup_interval_seconds * 1000;
     
     sessionCleanupInterval = setInterval(async () => {
+      if (isCleanupRunning) {
+        logger.warn('Session cleanup already running, skipping this interval');
+        return;
+      }
+      
+      isCleanupRunning = true;
       try {
         await deleteExpiredSessions();
       } catch (err) {
         logger.error({ err }, 'Session cleanup failed');
+      } finally {
+        isCleanupRunning = false;
       }
     }, cleanupIntervalMs);
     
