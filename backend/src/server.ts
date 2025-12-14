@@ -189,10 +189,6 @@ async function registerRoutes() {
     }
     const nonce = nonceResult.value;
 
-    if (!codeVerifier || !nonce) {
-      return reply.status(400).send({ success: false, error: { code: 'BAD_REQUEST', message: 'Missing PKCE verifier or nonce' } });
-    }
-
     const { exchangeCodeForTokens, verifyIdToken } = await import('./modules/auth/oidc.js');
     const { upsertUserAccount, createSession } = await import('./modules/auth/repository.js');
     const { createAuditLog, AuditAction, AuditResult } = await import('./modules/audit/repository.js');
