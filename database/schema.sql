@@ -142,7 +142,7 @@ CREATE TABLE app_core.user_session (
   session_uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_uuid    UUID NOT NULL REFERENCES app_core.user_account(user_uuid) ON DELETE CASCADE,
   session_key  TEXT UNIQUE NOT NULL,
-  token_json   JSONB NOT NULL, -- id_token, access_token, refresh_token
+  token_json   TEXT NOT NULL, -- Encrypted JSON containing id_token, access_token, refresh_token (AES-256-GCM)
   expires_at   TIMESTAMPTZ NOT NULL,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_used    TIMESTAMPTZ NOT NULL DEFAULT now()

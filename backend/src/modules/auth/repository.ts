@@ -11,6 +11,7 @@ import type {
   AuthenticatedUser,
 } from '../../types/index.js';
 import { logger } from '../../utils/logger.js';
+import { encryptJson, decryptJson } from '../../utils/encryption.js';
 
 /**
  * Find or create user account from OIDC claims
@@ -114,6 +115,7 @@ export async function buildAuthenticatedUser(
 
 /**
  * Create session
+ * Note: tokenJson is encrypted before storage using AES-256-GCM
  */
 export async function createSession(
   userUuid: string,
@@ -121,22 +123,31 @@ export async function createSession(
   tokenJson: Record<string, unknown>,
   expiresAt: Date
 ): Promise<UserSession> {
+  // Encrypt tokens before storing
+  const encryptedTokens = encryptJson(tokenJson);
+  
   const result = await query<UserSession>(
     `INSERT INTO app_core.user_session (user_uuid, session_key, token_json, expires_at)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [userUuid, sessionKey, JSON.stringify(tokenJson), expiresAt]
+    [userUuid, sessionKey, encryptedTokens, expiresAt]
   );
 
   if (result.rows.length === 0) {
     throw new Error('Failed to create session');
   }
 
-  return result.rows[0];
+  // Decrypt tokens in the returned session
+  const session = result.rows[0];
+  return {
+    ...session,
+    token_json: decryptJson(session.token_json as unknown as string) as any,
+  };
 }
 
 /**
  * Get session by key
+ * Note: tokenJson is decrypted after retrieval
  */
 export async function getSessionByKey(sessionKey: string): Promise<UserSession | null> {
   const inactivityCutoff = new Date(
@@ -151,7 +162,16 @@ export async function getSessionByKey(sessionKey: string): Promise<UserSession |
     [sessionKey, inactivityCutoff]
   );
 
-  return result.rows[0] || null;
+  const session = result.rows[0];
+  if (!session) {
+    return null;
+  }
+
+  // Decrypt tokens before returning
+  return {
+    ...session,
+    token_json: decryptJson(session.token_json as unknown as string) as any,
+  };
 }
 
 /**

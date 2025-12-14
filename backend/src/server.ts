@@ -3,7 +3,7 @@
  * Fastify server with security hardening (Helmet, CORS, rate limiting)
  */
 
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import Fastify from 'fastify';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
@@ -312,6 +312,38 @@ async function registerRoutes() {
 }
 
 /**
+ * Setup periodic session cleanup
+ */
+let sessionCleanupInterval: NodeJS.Timeout | null = null;
+
+async function setupSessionCleanup() {
+  const { deleteExpiredSessions } = await import('./modules/auth/repository.js');
+  
+  // Run cleanup immediately on startup
+  try {
+    const deletedCount = await deleteExpiredSessions();
+    logger.info({ deletedCount }, 'Initial session cleanup completed');
+  } catch (err) {
+    logger.error({ err }, 'Initial session cleanup failed');
+  }
+  
+  // Schedule periodic cleanup
+  const intervalMs = config.security.session_cleanup_interval_seconds * 1000;
+  sessionCleanupInterval = setInterval(async () => {
+    try {
+      await deleteExpiredSessions();
+    } catch (err) {
+      logger.error({ err }, 'Scheduled session cleanup failed');
+    }
+  }, intervalMs);
+  
+  logger.info(
+    { interval_seconds: config.security.session_cleanup_interval_seconds },
+    'Session cleanup scheduled'
+  );
+}
+
+/**
  * Start server
  */
 async function start() {
@@ -334,6 +366,9 @@ async function start() {
     // Set error handlers
     server.setErrorHandler(errorHandler);
     server.setNotFoundHandler(notFoundHandler);
+
+    // Setup session cleanup
+    await setupSessionCleanup();
 
     // Start listening
     await server.listen({
@@ -361,6 +396,12 @@ async function shutdown() {
   logger.info('Shutting down server...');
 
   try {
+    // Clear session cleanup interval
+    if (sessionCleanupInterval) {
+      clearInterval(sessionCleanupInterval);
+      sessionCleanupInterval = null;
+    }
+    
     await server.close();
     await closePool();
     logger.info('Server shut down gracefully');
