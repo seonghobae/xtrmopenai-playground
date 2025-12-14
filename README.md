@@ -116,7 +116,7 @@ OIDC_REDIRECT_URI=http://localhost:3000/api/auth/callback
 
 **OpenAI API**
 ```env
-OPENAI_API_KEY=sk-your-api-key
+OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
 ```
 
