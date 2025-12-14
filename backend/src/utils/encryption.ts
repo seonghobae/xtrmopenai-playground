@@ -119,6 +119,10 @@ function isEncrypted(data: string): boolean {
  *
  * @param encrypted - Base64-encoded encrypted payload or legacy plaintext.
  * @returns Decrypted UTF-8 string. Returns `null` if `encrypted` is `null` or `undefined`; returns the original input string unmodified if the input is not recognized as encrypted or if decryption fails.
+ *
+ * @warning If decryption fails or the input is not recognized as encrypted, this function returns the original input string unmodified.
+ *          Callers MUST validate whether the returned value is the same as the input to distinguish between successful decryption and fallback.
+ *          Failing to do so may mask decryption failures and introduce security vulnerabilities.
  */
 export async function decrypt(encrypted: string | null | undefined): Promise<string | null> {
   if (!encrypted) {
