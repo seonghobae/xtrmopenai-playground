@@ -14,6 +14,7 @@ import { logger } from './utils/logger.js';
 import { healthCheck, closePool } from './utils/database.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { discoverOidcConfig } from './modules/auth/oidc.js';
+import { deleteExpiredSessions } from './modules/auth/repository.js';
 
 const OIDC_RETURN_URL_COOKIE = 'oidc_return_to';
 
@@ -345,7 +346,6 @@ async function start() {
     });
 
     // Start session cleanup scheduler
-    const { deleteExpiredSessions } = await import('./modules/auth/repository.js');
     const cleanupIntervalMs = config.security.session_cleanup_interval_seconds * 1000;
     
     sessionCleanupInterval = setInterval(async () => {
