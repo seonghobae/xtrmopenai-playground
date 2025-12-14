@@ -215,28 +215,40 @@ app.post('/api/responses/run', {
 
 ### PII and Retention Policy
 
-**Challenge**: Audit logs contain PII (IP addresses, user agents) needed for security investigations, but this conflicts with privacy requirements. Masking Korean language or other multilingual LLM responses at runtime is impractical.
+**Challenge**: Audit logs require forensic data (IP addresses, user agents) for security investigations, but storing raw PII conflicts with privacy requirements.
 
-**Solution**: Database-stored multi-tier retention policies with progressive anonymization.
+**Solution**: IP address hashing at insertion time + database-stored multi-tier retention policies.
+
+#### IP Address Protection
+
+**IP addresses are hashed at insertion time** using HMAC-SHA256:
+- Function: `hashIpAddress()` in `backend/src/utils/encryption.ts`
+- Algorithm: HMAC-SHA256 with dedicated salt (`AUDIT_IP_HASH_SALT`)
+- Benefits:
+  - Allows correlation of actions from same IP address
+  - Protects actual IP addresses from disclosure
+  - One-way transformation prevents reverse lookup
+  - Maintains forensic value without storing sensitive PII
+- See: `createAuditLog()` in `backend/src/modules/audit/repository.ts`
 
 #### Multi-Tier Retention Strategy
 
-Audit logs follow a conservative 4-stage lifecycle stored in `app_core.retention_policy`:
+Audit logs follow a 3-stage lifecycle stored in `app_core.retention_policy`:
 
 1. **Full Retention** (Default: 180 days / 6 months)
-   - All data including PII kept intact
+   - IP address hashes and user agents kept intact
    - Enables comprehensive security incident investigation
    - Meets most regulatory requirements for active investigation periods
 
 2. **Partial Anonymization** (Default: 365 days / 1 year)
-   - IP addresses hashed with HMAC-SHA256 (128-bit output) using dedicated stable salt
    - User agents retained for security analysis
+   - IP address hashes kept for correlation (already non-reversible)
    - Meets PCI DSS requirement 10.7 (minimum 1 year)
    - Marked with `_partial_anonymized` timestamp in `detail_json`
 
 3. **Full Anonymization** (Default: 1095 days / 3 years)
-   - All PII removed (IP address, user agent set to NULL)
-   - Only non-PII audit metadata retained
+   - All identifying information removed (IP hash, user agent set to NULL)
+   - Only non-PII audit metadata retained (action, result, timestamps)
    - Meets SOC 2 audit evidence requirements
    - Marked with `_anonymized` timestamp in `detail_json`
 
@@ -270,12 +282,14 @@ deletion_days:        1825  -- 5 years (financial regulations)
 
 #### Access Control
 
-Audit log access is controlled via RBAC to prevent unauthorized PII exposure:
+Audit log access is controlled via RBAC to prevent unauthorized disclosure:
 
 - **General users**: Should NOT have access to audit log endpoints
-- **Auditors/Security roles**: Full access to all fields including PII (ip_addr, user_agent, detail_json)
+- **Auditors/Security roles**: Full access to all fields (IP hashes, user agents, detail_json)
 - **Admin role**: Full access to audit logs within their organization scope
 - **Organization isolation**: Users can only query logs from organizations they belong to
+
+**Note**: `ip_addr` field contains HMAC-SHA256 hashes, not raw IP addresses. This protects privacy while maintaining forensic correlation capability.
 
 **Implementation Requirements**:
 1. API endpoints must check user role before calling `getAuditLogs()`
