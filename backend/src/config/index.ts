@@ -22,7 +22,7 @@ const configSchema = z.object({
   DATABASE_USER: z.string().default('postgres'),
   DATABASE_PASSWORD: z.string(),
   DATABASE_MAX_CONNECTIONS: z.coerce.number().default(10),
-  DATABASE_SSL_ENABLED: z.string().optional().transform(val => val === 'true' || val === '1'),
+  DATABASE_SSL_ENABLED: z.string().default('false').transform(val => val === 'true' || val === '1'),
   DATABASE_SSL_CA: z.string().optional(),
   DATABASE_SSL_CERT: z.string().optional(),
   DATABASE_SSL_KEY: z.string().optional(),
