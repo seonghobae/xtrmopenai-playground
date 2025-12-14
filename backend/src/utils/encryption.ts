@@ -16,7 +16,7 @@ const SALT_LENGTH = 32;
  */
 async function deriveKey(salt: Buffer, masterKey: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    crypto.pbkdf2(masterKey, salt, 100000, 32, 'sha256', (err, derivedKey) => {
+    crypto.pbkdf2(masterKey, salt, 600000, 32, 'sha256', (err, derivedKey) => {
       if (err) reject(err);
       else resolve(derivedKey);
     });
