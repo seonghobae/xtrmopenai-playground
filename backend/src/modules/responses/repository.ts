@@ -31,8 +31,8 @@ export async function createResponseRun(params: {
       params.org_uuid || null,
       params.user_uuid || null,
       params.model_name,
-      JSON.stringify(params.request_json),
-      params.response_json ? JSON.stringify(params.response_json) : null,
+      params.request_json,
+      params.response_json || null,
       params.token_input || null,
       params.token_output || null,
       params.cost_usd || null,
@@ -147,7 +147,7 @@ export async function createStreamEvent(
     `INSERT INTO app_core.stream_event (run_uuid, event_type, event_json, sequence_num)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [runUuid, eventType, JSON.stringify(eventJson), sequenceNum]
+    [runUuid, eventType, eventJson, sequenceNum]
   );
 
   if (result.rows.length === 0) {
@@ -228,7 +228,7 @@ export async function updateResponseRun(
 
   if (updates.response_json !== undefined) {
     fields.push(`response_json = $${paramIndex++}`);
-    values.push(JSON.stringify(updates.response_json));
+    values.push(updates.response_json);
   }
 
   if (updates.token_input !== undefined) {

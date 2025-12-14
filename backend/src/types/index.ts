@@ -339,4 +339,7 @@ export interface AppConfig {
     rate_limit_max: number;
     rate_limit_window_ms: number;
   };
+  encryption: {
+    key: string;
+  };
 }

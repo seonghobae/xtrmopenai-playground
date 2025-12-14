@@ -36,7 +36,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<Audi
         params.target_type || null,
         params.target_id || null,
         params.result_code,
-        JSON.stringify(params.detail_json || {}),
+        params.detail_json || {},
         params.ip_addr || null,
         params.user_agent || null,
       ]
