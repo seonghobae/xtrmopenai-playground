@@ -250,19 +250,24 @@ export async function createMcpExecution(params: {
 
 /**
  * Get execution logs with pagination
- * 
- * Performance note: COUNT(*) queries without filters may experience performance
- * degradation on large datasets (>1,000,000 rows). Monitor query execution time and
- * alert if >1s; track slow query count and planning time in logs.
- * 
+ *
+ * Performance note: Unfiltered COUNT(*) queries may degrade when mcp_execution exceeds
+ * ~1M rows due to full table scans. In production, monitor query execution time and
+ * consider requiring at least one filter parameter (tool_uuid, org_uuid, user_uuid, or
+ * status_text) for optimal index usage. Composite indexes are in place to optimize
+ * filtered queries: (tool_uuid, created_at), (status_text, created_at),
+ * (org_uuid, created_at), (user_uuid, created_at).
+ *
+ * Monitoring guidance:
+ * - Track query execution time; alert if >1s
+ * - Monitor slow query count and planning time
+ * - Log COUNT(*) durations for analysis
+ *
  * Mitigation strategies:
- * - Use approximate counts: SELECT reltuples FROM pg_class WHERE relname = $1
- * - Require filtered queries or enforce LIMIT for unfiltered requests
- * - Maintain summary tables or materialized views for analytics
- * - Use indexed partial counts: SELECT COUNT(*) FROM table WHERE indexed_column = $1 AND created_at > $2
- * 
- * Composite indexes (tool_uuid+created_at, status_text+created_at, org_uuid+created_at,
- * user_uuid+created_at) are in place to optimize filtered queries.
+ * - Use approximate row counts (pg_class.reltuples) for non-critical displays
+ * - Require filtered queries or add LIMIT for large result sets
+ * - Maintain summary tables or materialized views for dashboards
+ * - Use indexed partial counts where possible
  */
 export async function getMcpExecutions(params: {
   tool_uuid?: string;
