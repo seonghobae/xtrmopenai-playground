@@ -7,7 +7,38 @@ import { query } from '../../utils/database.js';
 import type { AuditLog, RetentionPolicy } from '../../types/index.js';
 import { logger } from '../../utils/logger.js';
 import { config } from '../../config/index.js';
+import { hashIpAddress } from '../../utils/encryption.js';
 
+/**
+ * Parameters for creating an audit log entry.
+ * 
+ * **IMPORTANT PII HANDLING GUIDELINES:**
+ * 
+ * - `ip_addr`: Will be automatically hashed using HMAC-SHA256 before storage. 
+ *   Pass the raw IP address; hashing is handled internally.
+ * 
+ * - `user_agent`: Stored as-is for forensic purposes. This is generally considered
+ *   less sensitive than IP addresses, but be aware it may contain identifying information.
+ * 
+ * - `detail_json`: Additional context for the audit event.
+ *   **MUST NOT contain:**
+ *   - Passwords or password hashes
+ *   - API keys, tokens, or secrets
+ *   - Credit card numbers or payment information
+ *   - Social Security Numbers or national ID numbers
+ *   - Unredacted email addresses (use user_uuid instead)
+ *   - Phone numbers
+ *   - Any other sensitive personal information
+ *   
+ *   **SHOULD contain:**
+ *   - Action-specific metadata (e.g., resource IDs, configuration changes)
+ *   - Non-sensitive identifiers (UUIDs, object names)
+ *   - Status codes and error messages (after redaction)
+ *   - Request/response sizes and counts
+ * 
+ * For PII that must be logged, use the appropriate dedicated fields (user_uuid, org_uuid)
+ * or ensure proper redaction before including in detail_json.
+ */
 export interface CreateAuditLogParams {
   org_uuid?: string;
   user_uuid?: string;
@@ -16,15 +47,22 @@ export interface CreateAuditLogParams {
   target_id?: string;
   result_code: string;
   detail_json?: Record<string, unknown>;
+  /** Raw IP address - will be hashed automatically before storage */
   ip_addr?: string;
   user_agent?: string;
 }
 
 /**
- * Create audit log entry
+ * Create a new audit log record with privacy-preserving handling of the provided IP address.
+ *
+ * @param params - Parameters for the audit entry. The `ip_addr` value will be hashed before storage; `detail_json` must avoid sensitive PII and should be redacted when necessary.
+ * @returns The inserted `AuditLog` row on success, `null` if the entry could not be created.
  */
 export async function createAuditLog(params: CreateAuditLogParams): Promise<AuditLog | null> {
   try {
+    // Hash IP address for privacy while maintaining correlation capability
+    const hashedIpAddr = hashIpAddress(params.ip_addr);
+
     const result = await query<AuditLog>(
       `INSERT INTO app_core.audit_log
        (org_uuid, user_uuid, action_name, target_type, target_id, result_code, detail_json, ip_addr, user_agent)
@@ -38,7 +76,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<Audi
         params.target_id || null,
         params.result_code,
         params.detail_json || {},
-        params.ip_addr || null,
+        hashedIpAddr,
         params.user_agent || null,
       ]
     );
