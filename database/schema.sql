@@ -174,6 +174,9 @@ CREATE INDEX user_session_user_idx ON app_core.user_session(user_uuid);
 CREATE INDEX user_session_expires_idx ON app_core.user_session(expires_at);
 CREATE INDEX idx_mcp_execution_org_created ON app_core.mcp_execution(org_uuid, created_at) WHERE org_uuid IS NOT NULL;
 CREATE INDEX idx_mcp_execution_user_created ON app_core.mcp_execution(user_uuid, created_at) WHERE user_uuid IS NOT NULL;
+CREATE INDEX idx_mcp_execution_tool ON app_core.mcp_execution(tool_uuid);
+CREATE INDEX idx_mcp_execution_tool_created ON app_core.mcp_execution(tool_uuid, created_at) WHERE tool_uuid IS NOT NULL;
+CREATE INDEX idx_mcp_execution_status_created ON app_core.mcp_execution(status_text, created_at);
 
 -- Insert default model prices (example values, update with actual OpenAI pricing)
 INSERT INTO app_core.model_price (model_name, input_price, output_price) VALUES
